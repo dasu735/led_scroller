@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "512212642315",
+    "project_id": "leddegitalscroll",
+    "storage_bucket": "leddegitalscroll.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:512212642315:android:476c7fa2ba47694d56750e",
+        "android_client_info": {
+          "package_name": "com.panacea.led_digital_scroll"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCYyXt1D4_3dArJ1HUYlXOs-38r1g4nQJE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:512212642315:android:ac770ec36f70ce7c56750e",
+        "android_client_info": {
+          "package_name": "com.panacea.led_digital_scroll"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCYyXt1D4_3dArJ1HUYlXOs-38r1g4nQJE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
