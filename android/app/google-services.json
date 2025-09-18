@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:512212642315:android:476c7fa2ba47694d56750e",
         "android_client_info": {
-          "package_name": "com.panacea.led_digital_scroll"
+          "package_name": "com.example.led_digital_scroll"
         }
       },
       "oauth_client": [],
@@ -28,7 +28,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:512212642315:android:ac770ec36f70ce7c56750e",
         "android_client_info": {
-          "package_name": "com.panacea.led_digital_scroll"
+          "package_name": "com.example.led_digital_scroll"
         }
       },
       "oauth_client": [],

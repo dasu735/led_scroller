@@ -1,3 +1,5 @@
+// android/settings.gradle.kts
+
 pluginManagement {
     val flutterSdkPath = run {
         val properties = java.util.Properties()
@@ -7,14 +9,32 @@ pluginManagement {
         flutterSdkPath
     }
 
+    // Include Flutter Gradle plugin build so Flutter tooling is available
     includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
     repositories {
         google()
         mavenCentral()
         gradlePluginPortal()
+        maven("https://jitpack.io")
+        // some plugins expect this, harmless to include
     }
 }
+
+dependencyResolutionManagement {
+    // Prefer settings-defined repositories but allow plugins to add repos if they must.
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+
+    repositories {
+        google()
+        mavenCentral()
+        maven("https://jitpack.io")
+        // This is the important one that resolves io.flutter:* AARs in many setups:
+        maven("https://storage.googleapis.com/download.flutter.io")
+    }
+}
+
+rootProject.name = "led_scroller"
 
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"

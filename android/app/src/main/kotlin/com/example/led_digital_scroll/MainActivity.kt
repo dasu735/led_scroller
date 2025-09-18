@@ -1,4 +1,4 @@
-package com.panacea.led_digital_scroll
+package com.example.led_digital_scroll
 
 import io.flutter.embedding.android.FlutterActivity
 
