@@ -7,7 +7,7 @@ import 'led_scroller.dart';
 import '../utils/text_to_matrix.dart';
 
 class PreviewBox extends StatefulWidget {
-  final GlobalKey? previewKey;
+  final GlobalKey? previewKey; // RepaintBoundary key from parent
   final String displayText;
   final double textSize;
   final Color textColor;
@@ -20,10 +20,8 @@ class PreviewBox extends StatefulWidget {
   final bool directionLeft;
   final bool blinkText;
   final bool blinkBackground;
-
-  /// Unified callback used by control panel AND the preview camera button.
-  /// Value is a File? representing the chosen image (or null if cleared).
   final ValueChanged<File?>? onPickBackgroundImage;
+  final bool glow;
 
   const PreviewBox({
     super.key,
@@ -41,6 +39,7 @@ class PreviewBox extends StatefulWidget {
     required this.blinkText,
     required this.blinkBackground,
     this.onPickBackgroundImage,
+    this.glow = true,
   });
 
   @override
@@ -58,9 +57,7 @@ class _PreviewBoxState extends State<PreviewBox>
     super.initState();
     _regenMatrix();
     _blinkController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    )
+        vsync: this, duration: const Duration(milliseconds: 500))
       ..addListener(() {
         if (widget.blinkText || widget.blinkBackground) {
           final newVisible = _blinkController.value < 0.5;
@@ -79,7 +76,6 @@ class _PreviewBoxState extends State<PreviewBox>
         oldWidget.textSize != widget.textSize) {
       _regenMatrix();
     }
-
     if (oldWidget.blinkText != widget.blinkText ||
         oldWidget.blinkBackground != widget.blinkBackground) {
       if (widget.blinkText || widget.blinkBackground) {
@@ -100,7 +96,6 @@ class _PreviewBoxState extends State<PreviewBox>
   void _regenMatrix() {
     final fontSizeForRaster = math.max(24.0, widget.textSize * 2.5);
     final baseDot = math.max(2.0, widget.textSize / 16.0);
-    // dotPixelSize = dot + spacing
     final dotPixelSize = baseDot + math.max(0.0, baseDot / 3.0);
 
     _matrixFuture = textToDotMatrix(
@@ -116,7 +111,6 @@ class _PreviewBoxState extends State<PreviewBox>
       maxHeight: 1200,
       dotPixelSize: dotPixelSize,
     );
-    // FutureBuilder will update when ready
   }
 
   Widget _buildBackgroundSnapshot(bool visible) {
@@ -151,24 +145,24 @@ class _PreviewBoxState extends State<PreviewBox>
   Widget build(BuildContext context) {
     const double previewHeight = 195.0;
 
-    return RepaintBoundary(
-      key: widget.previewKey,
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.blue, width: 2),
-            borderRadius: BorderRadius.circular(6),
-            color: Colors.transparent,
-          ),
-          height: previewHeight,
-          width: double.infinity,
+    // Keep outer border outside the RepaintBoundary so exported images/GIFs don't include it.
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.blue, width: 2),
+          borderRadius: BorderRadius.circular(6),
+          color: Colors.transparent,
+        ),
+        height: previewHeight,
+        width: double.infinity,
+        child: RepaintBoundary(
+          key: widget.previewKey,
           child: Stack(
             fit: StackFit.expand,
             children: [
               _buildBackgroundSnapshot(_visible),
-              // Use LayoutBuilder to size the scroller to available width/height
               LayoutBuilder(builder: (context, constraints) {
                 return Center(
                   child: FutureBuilder<List<List<bool>>>(
@@ -182,45 +176,62 @@ class _PreviewBoxState extends State<PreviewBox>
                         );
                       }
                       if (snap.hasError || snap.data == null) {
-                        return Text(
-                          'Error creating matrix',
-                          style: TextStyle(color: widget.textColor),
-                        );
+                        return Text('Error creating matrix',
+                            style: TextStyle(color: widget.textColor));
                       }
 
                       final matrix = snap.data!;
                       final dotSize = math.max(2.0, widget.textSize / 16.0);
                       final spacing = math.max(0.0, dotSize / 3.0);
-                      final textOpacity =
-                          (widget.blinkText && !_visible) ? 0.0 : 1.0;
 
-                      // compute a safe width based on available width; prevents overflow and gives stable capture dimensions
-                      final safeWidth = constraints.maxWidth.isFinite
+                      // Compute content height for vertical centering:
+                      // Each matrix row corresponds to (dotSize) vertical pixels,
+                      // plus we consider spacing between rows. We approximated dotPixel height as dotSize + spacing.
+                      final double cellPixelHeight = dotSize + spacing;
+                      final int rows = matrix.length;
+                      final double contentHeight = rows * cellPixelHeight;
+
+                      // safeHeight is the visual area available for the scroller
+                      final double safeWidth = constraints.maxWidth.isFinite
                           ? constraints.maxWidth
                           : MediaQuery.of(context).size.width;
-                      final safeHeight = previewHeight.clamp(
+                      final double safeHeight = previewHeight.clamp(
                           40.0,
                           constraints.maxHeight.isFinite
                               ? constraints.maxHeight
                               : previewHeight);
 
+                      // If content smaller than available, add vertical padding to center it
+                      final double verticalPadding = contentHeight < safeHeight
+                          ? (safeHeight - contentHeight) / 2.0
+                          : 0.0;
+
+                      final textOpacity =
+                          (widget.blinkText && !_visible) ? 0.0 : 1.0;
+
                       return AnimatedOpacity(
                         duration: const Duration(milliseconds: 120),
                         opacity: textOpacity,
-                        child: SizedBox(
-                          width: safeWidth,
-                          height: safeHeight,
-                          child: LedScroller(
-                            matrix: matrix,
-                            dotSize: dotSize,
-                            spacing: spacing,
-                            onColor: widget.textColor,
-                            offColor: Colors.transparent,
-                            glow: true,
-                            speedPxPerSec:
-                                (widget.speed / 200.0) * 180.0 + 12.0,
-                            playing: widget.playing,
-                            directionLeft: widget.directionLeft,
+                        child: Padding(
+                          padding:
+                              EdgeInsets.symmetric(vertical: verticalPadding),
+                          child: SizedBox(
+                            width: safeWidth,
+                            height: contentHeight < safeHeight
+                                ? contentHeight
+                                : safeHeight,
+                            child: LedScroller(
+                              matrix: matrix,
+                              dotSize: dotSize,
+                              spacing: spacing,
+                              onColor: widget.textColor,
+                              offColor: Colors.transparent,
+                              glow: widget.glow,
+                              speedPxPerSec:
+                                  (widget.speed / 200.0) * 180.0 + 12.0,
+                              playing: widget.playing,
+                              directionLeft: widget.directionLeft,
+                            ),
                           ),
                         ),
                       );
@@ -233,11 +244,8 @@ class _PreviewBoxState extends State<PreviewBox>
                 right: 8,
                 child: GestureDetector(
                   onTap: () {
-                    // call unified background-image callback; parent decides how to pick image
-                    if (widget.onPickBackgroundImage != null) {
-                      // sending null indicates "pick/clear" — parent can open picker
+                    if (widget.onPickBackgroundImage != null)
                       widget.onPickBackgroundImage!(null);
-                    }
                   },
                   child: Container(
                     height: 36,
@@ -251,10 +259,8 @@ class _PreviewBoxState extends State<PreviewBox>
                       'assets/images/camera.png',
                       color: Colors.white,
                       fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Icon(Icons.camera_alt,
-                            color: Colors.white, size: 20);
-                      },
+                      errorBuilder: (c, e, s) => const Icon(Icons.camera_alt,
+                          color: Colors.white, size: 20),
                     ),
                   ),
                 ),
