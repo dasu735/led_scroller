@@ -16,10 +16,9 @@ class ControlPanel extends StatelessWidget {
   final bool blinkText, blinkBackground;
   final bool isBusy;
   final List<String> history;
-  final bool playing; // whether scroller is playing
-  final bool isFavorite; // whether current text is favorited
+  final bool playing;
+  final bool isFavorite;
 
-  // callbacks (match your signatures)
   final ValueChanged<String> onTextChanged;
   final ValueChanged<double> onSpeedChanged;
   final ValueChanged<double> onTextSizeChanged;
@@ -40,7 +39,7 @@ class ControlPanel extends StatelessWidget {
   final ValueChanged<int> onDeleteHistoryAt;
   final ValueChanged<String> onPickHistoryItem;
   final VoidCallback onShareApp;
-  final VoidCallback onToggleFavorite; // NEW
+  final VoidCallback onToggleFavorite;
 
   const ControlPanel({
     super.key,
@@ -147,7 +146,6 @@ class ControlPanel extends StatelessWidget {
         });
   }
 
-  // choose readable foreground color for a background color
   Color _foregroundFor(Color bg) =>
       bg.computeLuminance() > 0.5 ? Colors.black : Colors.white;
 
@@ -184,16 +182,13 @@ class ControlPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
+          // IconButton(
+          //     icon: const Icon(Icons.camera_alt, color: Colors.white),
+          //     onPressed: onOpenImagePicker),
+          // const SizedBox(width: 4),
           IconButton(
-              icon: const Icon(Icons.camera_alt, color: Colors.white),
-              onPressed: onOpenImagePicker),
-          const SizedBox(width: 4),
-          // Star favorite button
-          IconButton(
-            icon: Icon(
-              isFavorite ? Icons.star : Icons.star_border,
-              color: isFavorite ? active : Colors.white,
-            ),
+            icon: Icon(isFavorite ? Icons.star : Icons.star_border,
+                color: isFavorite ? active : Colors.white),
             onPressed: onToggleFavorite,
           ),
           const SizedBox(width: 4),
@@ -202,47 +197,28 @@ class ControlPanel extends StatelessWidget {
               onPressed: onShareApp),
         ]),
         const SizedBox(height: 12),
-
-        // Play controls — center icon toggles play/pause using playing flag
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            // Previous (left)
-            _actionButton(
-              context,
+        Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+          _actionButton(context,
               icon: Icons.skip_previous,
               enabled: !isBusy,
               background: isBusy ? disabledColor : active,
               iconColor: isBusy ? Colors.white70 : fgActive,
-              onPressed: () => onSetDirection(1),
-            ),
-
-            // Play/Pause (center) — shows pause when playing, play when stopped
-            _actionButton(
-              context,
+              onPressed: () => onSetDirection(1)),
+          _actionButton(context,
               icon: playing ? Icons.pause : Icons.play_arrow,
               enabled: !isBusy,
               background: isBusy ? disabledColor : active,
               iconColor: isBusy ? Colors.white70 : fgActive,
               onPressed: onTogglePlay,
-              large: true,
-            ),
-
-            // Next (right)
-            _actionButton(
-              context,
+              large: true),
+          _actionButton(context,
               icon: Icons.skip_next,
               enabled: !isBusy,
               background: isBusy ? disabledColor : active,
               iconColor: isBusy ? Colors.white70 : fgActive,
-              onPressed: () => onSetDirection(-1),
-            ),
-          ],
-        ),
-
+              onPressed: () => onSetDirection(-1)),
+        ]),
         const SizedBox(height: 8),
-
-        // Speed slider
         Row(children: [
           const Text('Speed', style: TextStyle(color: Colors.white)),
           Expanded(
@@ -255,8 +231,6 @@ class ControlPanel extends StatelessWidget {
           Text('${speed.toInt()} Px',
               style: const TextStyle(color: Colors.white)),
         ]),
-
-        // Size slider
         Row(children: [
           const Text('Size', style: TextStyle(color: Colors.white)),
           Expanded(
@@ -269,10 +243,7 @@ class ControlPanel extends StatelessWidget {
           Text('${textSize.toInt()} Px',
               style: const TextStyle(color: Colors.white)),
         ]),
-
         const SizedBox(height: 8),
-
-        // Colors row
         Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
           const Text('Colors',
               style:
@@ -292,10 +263,7 @@ class ControlPanel extends StatelessWidget {
                   foregroundColor: Colors.white),
               child: const Text('Background')),
         ]),
-
         const SizedBox(height: 8),
-
-        // Background toggles
         Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
           ElevatedButton(
               onPressed: () {
@@ -325,10 +293,7 @@ class ControlPanel extends StatelessWidget {
                   ElevatedButton.styleFrom(backgroundColor: Colors.grey[800]),
               child: const Text('LED')),
         ]),
-
         const SizedBox(height: 12),
-
-        // Audio / blinking toggles
         Row(children: [
           Checkbox(
               value: blinkText,
@@ -342,10 +307,7 @@ class ControlPanel extends StatelessWidget {
               activeColor: active),
           const Text('Blink Background', style: TextStyle(color: Colors.white)),
         ]),
-
         const SizedBox(height: 12),
-
-        // Share / Download GIF buttons — use textColor when active
         Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
           Expanded(
             child: ElevatedButton.icon(
@@ -356,9 +318,8 @@ class ControlPanel extends StatelessWidget {
                   style: TextStyle(
                       color: _foregroundFor(isBusy ? disabledColor : active))),
               style: ElevatedButton.styleFrom(
-                backgroundColor: isBusy ? disabledColor : active,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
+                  backgroundColor: isBusy ? disabledColor : active,
+                  padding: const EdgeInsets.symmetric(vertical: 12)),
             ),
           ),
           const SizedBox(width: 8),
@@ -370,18 +331,14 @@ class ControlPanel extends StatelessWidget {
                   color: _foregroundFor(isBusy ? disabledColor : active)),
               label: const Text('Download GIF'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: isBusy ? disabledColor : active,
-                foregroundColor:
-                    _foregroundFor(isBusy ? disabledColor : active),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
+                  backgroundColor: isBusy ? disabledColor : active,
+                  foregroundColor:
+                      _foregroundFor(isBusy ? disabledColor : active),
+                  padding: const EdgeInsets.symmetric(vertical: 12)),
             ),
           ),
         ]),
-
         const SizedBox(height: 8),
-
-        // PNG actions — smaller secondary buttons but still use textColor for accents
         Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
           OutlinedButton.icon(
             onPressed:
@@ -390,9 +347,9 @@ class ControlPanel extends StatelessWidget {
             label: Text('Share PNG',
                 style: TextStyle(color: isBusy ? disabledColor : active)),
             style: OutlinedButton.styleFrom(
-              side: BorderSide(color: isBusy ? disabledColor : active),
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-            ),
+                side: BorderSide(color: isBusy ? disabledColor : active),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 10, horizontal: 8)),
           ),
           OutlinedButton.icon(
             onPressed: (isBusy || onDownloadPng == null)
@@ -402,25 +359,22 @@ class ControlPanel extends StatelessWidget {
             label: Text('Save PNG',
                 style: TextStyle(color: isBusy ? disabledColor : active)),
             style: OutlinedButton.styleFrom(
-              side: BorderSide(color: isBusy ? disabledColor : active),
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-            ),
+                side: BorderSide(color: isBusy ? disabledColor : active),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 10, horizontal: 8)),
           ),
         ]),
       ]),
     );
   }
 
-  // Helper builder for the play/action buttons to keep a uniform look
-  Widget _actionButton(
-    BuildContext context, {
-    required IconData icon,
-    required bool enabled,
-    required Color background,
-    required Color iconColor,
-    required VoidCallback? onPressed,
-    bool large = false,
-  }) {
+  Widget _actionButton(BuildContext context,
+      {required IconData icon,
+      required bool enabled,
+      required Color background,
+      required Color iconColor,
+      required VoidCallback? onPressed,
+      bool large = false}) {
     final double size = large ? 56 : 46;
     final double iconSize = large ? 28 : 20;
     return SizedBox(
@@ -429,13 +383,11 @@ class ControlPanel extends StatelessWidget {
       child: ElevatedButton(
         onPressed: enabled ? onPressed : null,
         style: ElevatedButton.styleFrom(
-          backgroundColor: enabled ? background : Colors.grey.shade700,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
-          ),
-          padding: EdgeInsets.zero,
-          elevation: 0,
-        ),
+            backgroundColor: enabled ? background : Colors.grey.shade700,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+            padding: EdgeInsets.zero,
+            elevation: 0),
         child: Icon(icon, color: iconColor, size: iconSize),
       ),
     );

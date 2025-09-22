@@ -40,12 +40,11 @@ class FullscreenRotatedPreview extends StatelessWidget {
     final screenW = media.size.width;
     final screenH = media.size.height;
 
-    // clamp inner sizes so rotated child doesn't overflow the screen
+    // clamp inner sizes so rotated child doesn't overflow
     final innerWidth = screenH.clamp(0.0, screenW * 1.2);
     final innerHeight = screenW.clamp(0.0, screenH * 1.2);
 
-    // we'll render a simple dummy matrix of full-on dots if you haven't passed a matrix.
-    // The FullscreenRotatedPreview is for visual full-screen experience; PreviewBox handles rasterization.
+    // Dummy matrix if you don't want to rasterize here; the visual effect only.
     final dummyRows = (textSize / 8).clamp(4, 80).toInt();
     final dummyCols = (screenW / (textSize / 8)).clamp(8, 500).toInt();
     final dummyMatrix = List.generate(
@@ -71,8 +70,16 @@ class FullscreenRotatedPreview extends StatelessWidget {
               )
             else if (useLedDots)
               CustomPaint(
-                painter: LedBackgroundPainter(),
-                child: Container(color: backgroundColor),
+                painter: LedBackgroundPainter(
+                  backgroundColor: backgroundColor,
+                  dotColor: (backgroundColor.computeLuminance() > 0.5
+                          ? Colors.black
+                          : Colors.white)
+                      .withOpacity(0.18),
+                  spacing: (textSize / 16.0 * 6).clamp(8.0, 24.0),
+                  dotRadius: (textSize / 16.0 * 0.45).clamp(1.0, 4.0),
+                ),
+                child: const SizedBox.expand(),
               )
             else
               Container(color: backgroundColor),
