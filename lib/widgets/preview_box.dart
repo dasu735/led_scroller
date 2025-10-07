@@ -240,33 +240,7 @@ class _PreviewBoxState extends State<PreviewBox>
                   ),
                 );
               }),
-              Positioned(
-                bottom: 8,
-                right: 8,
-                child: GestureDetector(
-                  onTap: () {
-                    if (widget.onPickBackgroundImage != null)
-                      widget.onPickBackgroundImage!(
-                          null); // parent will open picker
-                  },
-                  child: Container(
-                    height: 36,
-                    width: 36,
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.black26,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Image.asset(
-                      'assets/images/camera.png',
-                      color: Colors.white,
-                      fit: BoxFit.contain,
-                      errorBuilder: (c, e, s) => const Icon(Icons.camera_alt,
-                          color: Colors.white, size: 20),
-                    ),
-                  ),
-                ),
-              ),
+             
             ],
           ),
         ),

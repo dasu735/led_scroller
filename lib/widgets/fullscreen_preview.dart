@@ -1,8 +1,10 @@
 // lib/widgets/fullscreen_preview.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
+
 import 'led_scroller.dart';
 import 'led_background.dart';
+import 'preview_box.dart'; // <-- reuse your preview implementation
 
 class FullscreenRotatedPreview extends StatelessWidget {
   final String displayText;
@@ -40,17 +42,12 @@ class FullscreenRotatedPreview extends StatelessWidget {
     final screenW = media.size.width;
     final screenH = media.size.height;
 
-    // clamp inner sizes so rotated child doesn't overflow
-    final innerWidth = screenH.clamp(0.0, screenW * 1.2);
-    final innerHeight = screenW.clamp(0.0, screenH * 1.2);
+    // When rotated, the child width should match screen height and vice versa.
+    final childWidth = screenH;
+    final childHeight = screenW;
 
-    // Dummy matrix if you don't want to rasterize here; the visual effect only.
-    final dummyRows = (textSize / 8).clamp(4, 80).toInt();
-    final dummyCols = (screenW / (textSize / 8)).clamp(8, 500).toInt();
-    final dummyMatrix = List.generate(
-      dummyRows,
-      (_) => List.generate(dummyCols, (_) => true),
-    );
+    // Create a key for the preview box (so capture still works if needed).
+    final GlobalKey previewKey = GlobalKey();
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -58,6 +55,7 @@ class FullscreenRotatedPreview extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
+            // Background (image / gradient / LED dots / solid color)
             if (bgImageFile != null)
               Image.file(bgImageFile!, fit: BoxFit.cover)
             else if (useGradient)
@@ -83,26 +81,38 @@ class FullscreenRotatedPreview extends StatelessWidget {
               )
             else
               Container(color: backgroundColor),
+
+            // Center rotated preview that uses the same PreviewBox as the main screen.
             Center(
               child: RotatedBox(
-                quarterTurns: 1,
+                quarterTurns: 1, // rotate 90 degrees clockwise
                 child: SizedBox(
-                  width: innerWidth,
-                  height: innerHeight,
-                  child: LedScroller(
-                    matrix: dummyMatrix,
-                    dotSize: (textSize / 16.0).clamp(2.0, 999.0),
-                    spacing: ((textSize / 16.0) / 3.0).clamp(0.0, 999.0),
-                    onColor: textColor,
-                    offColor: Colors.transparent,
-                    glow: true,
-                    speedPxPerSec: (speed / 200.0) * 180.0 + 12.0,
+                  width: childWidth,
+                  height: childHeight,
+                  child: PreviewBox(
+                    // supply a local key so captures still work if you call them from full screen
+                    previewKey: previewKey,
+                    displayText: displayText,
+                    textSize: textSize,
+                    textColor: textColor,
+                    backgroundColor: backgroundColor,
+                    useGradient: useGradient,
+                    useLedDots: useLedDots,
+                    bgImageFile: bgImageFile,
+                    speed: speed,
                     playing: playing,
                     directionLeft: directionLeft,
+                    blinkText: blinkText,
+                    blinkBackground: blinkBackground,
+                    glow: true,
+                    // PreviewBox expects an onPickBackgroundImage; provide a no-op so full screen doesn't attempt to open pickers
+                    onPickBackgroundImage: (_) {},
                   ),
                 ),
               ),
             ),
+
+            // Close button
             Positioned(
               top: 12,
               right: 12,

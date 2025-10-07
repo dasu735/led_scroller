@@ -16,7 +16,7 @@ dependencies:
   cupertino_icons: ^1.0.8
 
   # Text-to-speech (optional)
-  flutter_tts: ^4.2.3
+  flutter_tts: ^4.0.0
 
   # Networking
   http: ^1.5.0
@@ -34,6 +34,10 @@ dependencies:
   marquee: ^2.2.3
   image_picker: ^1.2.0
   path_provider: ^2.0.14
+  file_selector: ^1.0.4
+  audioplayers: ^6.5.1
+  
+ 
 
 dev_dependencies:
   flutter_test:

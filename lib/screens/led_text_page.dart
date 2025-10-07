@@ -1,4 +1,5 @@
 // lib/screens/led_scroller_screen.dart
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -10,10 +11,12 @@ import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:path/path.dart' as p;
 
 import '../widgets/preview_box.dart';
 import '../widgets/control_panel.dart';
 import '../widgets/fullscreen_preview.dart';
+import '../widgets/ai_audio_card.dart';
 import 'privacy_policy.dart';
 
 class LedTestPage extends StatefulWidget {
@@ -26,8 +29,8 @@ class _LedTestPageState extends State<LedTestPage> {
   String displayText = "LED SCROLLER";
   double speed = 50;
   double textSize = 120;
-  Color textColor = Colors.green;
-  Color backgroundColor = Colors.white;
+  Color textColor = Colors.yellow;
+  Color backgroundColor = Colors.black;
   bool blinkText = false;
   bool blinkBackground = false;
   bool useGradient = false;
@@ -44,6 +47,10 @@ class _LedTestPageState extends State<LedTestPage> {
   final GlobalKey previewKey = GlobalKey();
   final ImagePicker _picker = ImagePicker();
 
+  // Keep a reference to any currently active AI stream controller so we can cancel if needed
+  StreamController<String>? _activeAiController;
+  StreamSubscription<String>? _activeAiListener;
+
   @override
   void initState() {
     super.initState();
@@ -52,6 +59,8 @@ class _LedTestPageState extends State<LedTestPage> {
 
   @override
   void dispose() {
+    _activeAiListener?.cancel();
+    _activeAiController?.close();
     textController.dispose();
     super.dispose();
   }
@@ -70,8 +79,7 @@ class _LedTestPageState extends State<LedTestPage> {
               width: 48,
               height: 4,
               decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(2)),
+                  color: Colors.white24, borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(height: 12),
             ListTile(
@@ -103,8 +111,8 @@ class _LedTestPageState extends State<LedTestPage> {
               trailing: const Icon(Icons.chevron_right, color: Colors.white),
               onTap: () {
                 Navigator.of(ctx).pop();
-                Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const PrivacyPolicy()));
+                Navigator.of(context)
+                    .push(MaterialPageRoute(builder: (_) => const PrivacyPolicy()));
               },
             ),
             const SizedBox(height: 8),
@@ -165,24 +173,24 @@ class _LedTestPageState extends State<LedTestPage> {
                               TextStyle(fontSize: 13, color: Colors.black54)),
                       const SizedBox(height: 8),
                       Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(5, (i) {
-                            final starIndex = i + 1;
-                            final filled = starIndex <= rating;
-                            return GestureDetector(
-                              onTap: () =>
-                                  setStateDialog(() => rating = starIndex),
-                              child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6.0),
-                                  child: Icon(
-                                      filled ? Icons.star : Icons.star_border,
-                                      size: 36,
-                                      color: filled
-                                          ? Colors.amber
-                                          : Colors.grey[400])),
-                            );
-                          })),
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(5, (i) {
+                          final starIndex = i + 1;
+                          final filled = starIndex <= rating;
+                          return GestureDetector(
+                            onTap: () => setStateDialog(() => rating = starIndex),
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 6.0),
+                              child: Icon(
+                                filled ? Icons.star : Icons.star_border,
+                                size: 36,
+                                color: filled ? Colors.amber : Colors.grey[400],
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
                       const SizedBox(height: 8),
                       Text(
                           rating == 0
@@ -313,7 +321,9 @@ class _LedTestPageState extends State<LedTestPage> {
       final boundary = previewKey.currentContext?.findRenderObject()
           as RenderRepaintBoundary?;
       if (boundary == null) return null;
-      final ui.Image image = await boundary.toImage(pixelRatio: 1.0);
+      // use devicePixelRatio to get crisp images on high-dpi screens
+      final dpr = ui.window.devicePixelRatio;
+      final ui.Image image = await boundary.toImage(pixelRatio: dpr);
       final ByteData? byteData =
           await image.toByteData(format: ui.ImageByteFormat.png);
       return byteData?.buffer.asUint8List();
@@ -336,11 +346,15 @@ class _LedTestPageState extends State<LedTestPage> {
   Future<void> _savePreviewPng() async {
     final bytes = await _capturePreviewPngBytes();
     if (bytes == null) return _showSnack('PNG save failed');
-    final dir = await getApplicationDocumentsDirectory();
-    final file = await File(
-            '${dir.path}/led_${DateTime.now().millisecondsSinceEpoch}.png')
-        .writeAsBytes(bytes);
-    _showSnack('Saved PNG to ${file.path}');
+
+    try {
+      final filename = 'led_${DateTime.now().millisecondsSinceEpoch}.png';
+      final savedPath = await _saveBytesToDownloadsOrFallback(bytes, filename);
+      _showSnack('Saved PNG to $savedPath');
+    } catch (e) {
+      debugPrint('save PNG failed: $e');
+      _showSnack('PNG save failed: $e');
+    }
   }
 
   Future<Uint8List?> _recordGifBytes(
@@ -364,7 +378,8 @@ class _LedTestPageState extends State<LedTestPage> {
 
       for (int i = 0; i < totalFrames; i++) {
         try {
-          final ui.Image uiImage = await boundary.toImage(pixelRatio: 1.0);
+          final dpr = ui.window.devicePixelRatio;
+          final ui.Image uiImage = await boundary.toImage(pixelRatio: dpr);
           final ByteData? bd =
               await uiImage.toByteData(format: ui.ImageByteFormat.png);
           if (bd != null) {
@@ -379,12 +394,13 @@ class _LedTestPageState extends State<LedTestPage> {
         } catch (e) {
           debugPrint('frame capture error: $e');
         }
-        if (i < totalFrames - 1)
+        if (i < totalFrames - 1) {
           await Future.delayed(Duration(milliseconds: frameDelayMs));
+        }
       }
       if (frames.isEmpty) return null;
       final encoder = img.GifEncoder();
-      final delayCs = (frameDelayMs / 10).round();
+      final delayCs = (frameDelayMs / 10).round(); // centiseconds
       for (final f in frames) {
         encoder.addFrame(f, duration: delayCs);
       }
@@ -421,15 +437,89 @@ class _LedTestPageState extends State<LedTestPage> {
   Future<void> _recordAndSaveGif() async {
     if (isRecording) return _showSnack('Busy — try again shortly.');
     _showSnack('Recording GIF (short)...');
+
     final bytes = await _recordGifBytes(durationSeconds: 3, fps: 6);
-    if (bytes == null)
+    if (bytes == null) {
       return _showSnack(
           'Failed to record GIF — try lower FPS or ensure preview fully visible.');
-    final dir = await getApplicationDocumentsDirectory();
-    final file = await File(
-            '${dir.path}/led_${DateTime.now().millisecondsSinceEpoch}.gif')
-        .writeAsBytes(bytes);
-    _showSnack('Saved GIF to ${file.path}');
+    }
+
+    try {
+      final filename = 'led_${DateTime.now().millisecondsSinceEpoch}.gif';
+      final savedPath = await _saveBytesToDownloadsOrFallback(bytes, filename);
+      _showSnack('Saved GIF to $savedPath');
+    } catch (e) {
+      debugPrint('save GIF failed: $e');
+      _showSnack('Failed to save GIF: $e');
+    }
+  }
+
+  /// Try to save to a platform-appropriate Downloads folder, falling back to app documents.
+  /// Returns the final saved full path.
+  Future<String> _saveBytesToDownloadsOrFallback(Uint8List bytes, String filename) async {
+    // Try common "Downloads" locations for each platform.
+    try {
+      // 1) Desktop platforms - use getDownloadsDirectory (if available)
+      if (!Platform.isAndroid && !Platform.isIOS) {
+        try {
+          final downloads = await getDownloadsDirectory();
+          if (downloads != null) {
+            final path = p.join(downloads.path, filename);
+            final file = await File(path).writeAsBytes(bytes);
+            return file.path;
+          }
+        } catch (e) {
+          debugPrint('desktop downloads write failed: $e');
+        }
+      }
+
+      // 2) Android - try common external downloads path first
+      if (Platform.isAndroid) {
+        try {
+          // Primary common path
+          final candidate = '/storage/emulated/0/Download';
+          final dir = Directory(candidate);
+          if (await dir.exists()) {
+            final path = p.join(candidate, filename);
+            final f = await File(path).writeAsBytes(bytes);
+            return f.path;
+          }
+        } catch (e) {
+          debugPrint('android primary download write failed: $e');
+        }
+
+        // Fallback: try getExternalStorageDirectory then create a Downloads directory
+        try {
+          final ext = await getExternalStorageDirectory();
+          if (ext != null) {
+            final downloadsDir = Directory(p.join(ext.path, 'Download'));
+            if (!await downloadsDir.exists()) {
+              try {
+                await downloadsDir.create(recursive: true);
+              } catch (_) {}
+            }
+            final path = p.join(downloadsDir.path, filename);
+            final f = await File(path).writeAsBytes(bytes);
+            return f.path;
+          }
+        } catch (e) {
+          debugPrint('android ext storage write failed: $e');
+        }
+      }
+
+      // 3) iOS and general fallback -> app documents directory
+      final doc = await getApplicationDocumentsDirectory();
+      final path = p.join(doc.path, filename);
+      final f = await File(path).writeAsBytes(bytes);
+      return f.path;
+    } catch (e) {
+      debugPrint('saveBytesToDownloadsOrFallback top-level failed: $e');
+      // As last resort, write to temporary directory
+      final tmp = await getTemporaryDirectory();
+      final fallbackPath = p.join(tmp.path, filename);
+      final f = await File(fallbackPath).writeAsBytes(bytes);
+      return f.path;
+    }
   }
 
   void _showSnack(String msg) {
@@ -468,21 +558,154 @@ class _LedTestPageState extends State<LedTestPage> {
     }));
   }
 
+  /// Simulated AI streaming: pushes word chunks into the provided controller then closes.
+  /// Replace this with your WebSocket or real streaming logic.
+  void _pumpSimulatedAi(StreamController<String> controller, String payload) async {
+    try {
+      final reply = 'Simulated AI reply for: $payload';
+      final words = reply.split(RegExp(r'\s+'));
+      for (var i = 0; i < words.length; i++) {
+        // small delay to simulate incremental server streaming
+        await Future.delayed(const Duration(milliseconds: 120));
+        if (controller.isClosed) return;
+        controller.add(words[i] + (i < words.length - 1 ? ' ' : ''));
+      }
+    } catch (e) {
+      debugPrint('simulate pump error: $e');
+      if (!controller.isClosed) controller.addError(e);
+    } finally {
+      if (!controller.isClosed) controller.close();
+    }
+  }
+
+  // Open bottom sheet with the AiAudioCard (wires streaming to update displayText)
+  void _openAiAudioCard() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: AiAudioCard(
+                  onTranscribed: (txt) {
+                    setState(() {
+                      displayText = txt;
+                      textController.text = txt;
+                      _addToHistory(txt);
+                    });
+                    // keep sheet open so user can tap AI
+                  },
+
+                  // When AI button is pressed - immediate notification
+                  onAiAction: (payload) {
+                    // optional: show a small status snackbar
+                    _showSnack('Sent to AI: ${payload.length > 80 ? payload.substring(0,80)+'...' : payload}');
+                  },
+
+                  // Build a broadcast stream for the payload; also listen here to update scroller live.
+                  aiResponseStreamBuilder: (payload) {
+                    // Cancel any previously active stream/listener
+                    _activeAiListener?.cancel();
+                    _activeAiController?.close();
+
+                    // create a broadcast controller so both AiAudioCard and this page can listen
+                    final controller = StreamController<String>.broadcast();
+                    _activeAiController = controller;
+
+                    // start pumping simulated chunks (replace with your WS streaming)
+                    _pumpSimulatedAi(controller, payload);
+
+                    // Listen here to update the displayText live as chunks arrive.
+                    String built = '';
+                    _activeAiListener = controller.stream.listen((chunk) {
+                      built += chunk;
+                      setState(() {
+                        displayText = built;
+                        textController.text = built;
+                      });
+                    }, onError: (e) {
+                      debugPrint('AI stream error on page listener: $e');
+                      if (mounted) _showSnack('AI stream error: $e');
+                    }, onDone: () {
+                      // final text done — add to history and clear active refs
+                      if (built.trim().isNotEmpty) {
+                        _addToHistory(built.trim());
+                      }
+                      _activeAiListener = null;
+                      _activeAiController = null;
+                    }, cancelOnError: true);
+
+                    // Return the broadcast stream to AiAudioCard so it can display the same stream too
+                    return controller.stream;
+                  },
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: Colors.black,
-        title: const Text('Preview', style: TextStyle(color: Colors.white)),
-        leading: IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white),
-            onPressed: _openBottomMenu),
-        actions: [
-          IconButton(
-              icon: const Icon(Icons.screen_rotation_alt),
-              onPressed: _openFullscreenPreview)
-        ],
+  backgroundColor: Colors.black,
+  title: const Text('Preview', style: TextStyle(color: Colors.white)),
+  leading: IconButton(
+    icon: const Icon(Icons.menu, color: Colors.white),
+    onPressed: _openBottomMenu,
+  ),
+  actions: [
+     GestureDetector(
+      onTap: _handlePreviewCameraPressed,
+      child: Container(
+        height: 36,
+        width: 36,
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: Colors.black26,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Image.asset(
+          'assets/images/camera.png',
+          color: Colors.white,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) =>
+              const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+        ),
+      ),
+    ),
+
+    const SizedBox(width: 8),
+    IconButton(
+      icon: const Icon(Icons.screen_rotation_alt),
+      onPressed: _openFullscreenPreview,
+    ),
+
+    // small spacing between icons
+    const SizedBox(width: 8),
+
+    // Custom camera tile (tappable)
+   
+  ],
+),
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'ai_mic_btn',
+        onPressed: _openAiAudioCard,
+        child: const Icon(Icons.volume_down_alt),
       ),
       body: SafeArea(
         child: Column(children: [
@@ -511,8 +734,7 @@ class _LedTestPageState extends State<LedTestPage> {
           ),
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                  10, 10, 10, MediaQuery.of(context).viewInsets.bottom + 10),
+              padding: EdgeInsets.fromLTRB(10, 10, 10, MediaQuery.of(context).viewInsets.bottom + 10),
               child: ControlPanel(
                 textController: textController,
                 displayText: displayText,
@@ -535,14 +757,12 @@ class _LedTestPageState extends State<LedTestPage> {
                 onSpeedChanged: (v) => setState(() => speed = v),
                 onTextSizeChanged: (v) => setState(() => textSize = v),
                 onToggleBlinkText: (b) => setState(() => blinkText = b),
-                onToggleBlinkBackground: (b) =>
-                    setState(() => blinkBackground = b),
+                onToggleBlinkBackground: (b) => setState(() => blinkBackground = b),
                 onTogglePlay: () => setState(() => playing = !playing),
                 onSetDirection: (d) => setState(() => scrollDirection = d),
                 onPickBackgroundImage: (f) => setState(() => bgImageFile = f),
                 onPickTextColor: (c) => setState(() => textColor = c),
-                onPickBackgroundColor: (c) =>
-                    setState(() => backgroundColor = c),
+                onPickBackgroundColor: (c) => setState(() => backgroundColor = c),
                 onUseGradientChanged: (b) => setState(() => useGradient = b),
                 onUseLedDotsChanged: (b) => setState(() => useLedDots = b),
                 onShare: _recordAndShareGif,
@@ -557,8 +777,7 @@ class _LedTestPageState extends State<LedTestPage> {
                     textController.text = s;
                   });
                 },
-                onShareApp: () => _shareAppLink(
-                    "https://play.google.com/store/apps/details?id=com.example.myapp"),
+                onShareApp: () => _shareAppLink("https://play.google.com/store/apps/details?id=com.example.myapp"),
                 onToggleFavorite: () {
                   _showSnack('Toggled favorite (not persisted)');
                 },

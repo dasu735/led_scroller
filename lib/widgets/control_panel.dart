@@ -89,8 +89,13 @@ class ControlPanel extends StatelessWidget {
             title:
                 const Text('Pick Color', style: TextStyle(color: Colors.white)),
             content: SingleChildScrollView(
-                child: ColorPicker(
-                    pickerColor: temp, onColorChanged: (c) => temp = c)),
+              child: ColorPicker(
+                pickerColor: temp,
+                onColorChanged: (c) => temp = c,
+                enableAlpha: false,
+                labelTypes: const [],
+              ),
+            ),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(context),
@@ -182,10 +187,6 @@ class ControlPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          // IconButton(
-          //     icon: const Icon(Icons.camera_alt, color: Colors.white),
-          //     onPressed: onOpenImagePicker),
-          // const SizedBox(width: 4),
           IconButton(
             icon: Icon(isFavorite ? Icons.star : Icons.star_border,
                 color: isFavorite ? active : Colors.white),
@@ -201,29 +202,29 @@ class ControlPanel extends StatelessWidget {
           _actionButton(context,
               icon: Icons.skip_previous,
               enabled: !isBusy,
-              background: isBusy ? disabledColor : active,
+              background: Colors.lightBlueAccent,
               iconColor: isBusy ? Colors.white70 : fgActive,
-              onPressed: () => onSetDirection(1)),
+              onPressed: () => onSetDirection(-1)),
           _actionButton(context,
               icon: playing ? Icons.pause : Icons.play_arrow,
               enabled: !isBusy,
-              background: isBusy ? disabledColor : active,
+              background: Colors.lightBlueAccent,
               iconColor: isBusy ? Colors.white70 : fgActive,
               onPressed: onTogglePlay,
               large: true),
           _actionButton(context,
               icon: Icons.skip_next,
               enabled: !isBusy,
-              background: isBusy ? disabledColor : active,
+              background: Colors.lightBlueAccent,
               iconColor: isBusy ? Colors.white70 : fgActive,
-              onPressed: () => onSetDirection(-1)),
+              onPressed: () => onSetDirection(1)),
         ]),
         const SizedBox(height: 8),
         Row(children: [
           const Text('Speed', style: TextStyle(color: Colors.white)),
           Expanded(
               child: Slider(
-                  activeColor: active,
+                  activeColor: Colors.lightBlueAccent,
                   value: speed,
                   min: 10,
                   max: 200,
@@ -232,10 +233,10 @@ class ControlPanel extends StatelessWidget {
               style: const TextStyle(color: Colors.white)),
         ]),
         Row(children: [
-          const Text('Size', style: TextStyle(color: Colors.white)),
+          const Text('Size    ', style: TextStyle(color: Colors.white)),
           Expanded(
               child: Slider(
-                  activeColor: active,
+                  activeColor: Colors.lightBlueAccent,
                   value: textSize,
                   min: 20,
                   max: 200,
@@ -273,7 +274,10 @@ class ControlPanel extends StatelessWidget {
               },
               style:
                   ElevatedButton.styleFrom(backgroundColor: Colors.grey[800]),
-              child: const Text('Solid')),
+              child: const Text('Solid',style: TextStyle(
+                color: Colors.white
+              ),
+              )),
           ElevatedButton(
               onPressed: () {
                 onUseGradientChanged(true);
@@ -282,7 +286,10 @@ class ControlPanel extends StatelessWidget {
               },
               style:
                   ElevatedButton.styleFrom(backgroundColor: Colors.grey[800]),
-              child: const Text('Gradient')),
+              child: const Text('Gradient',style: TextStyle(
+                color: Colors.white
+              ),
+              )),
           ElevatedButton(
               onPressed: () {
                 onUseLedDotsChanged(true);
@@ -291,21 +298,28 @@ class ControlPanel extends StatelessWidget {
               },
               style:
                   ElevatedButton.styleFrom(backgroundColor: Colors.grey[800]),
-              child: const Text('LED')),
+              child: const Text('LED',style: TextStyle(
+                color: Colors.white
+              ),
+              )),
         ]),
         const SizedBox(height: 12),
         Row(children: [
           Checkbox(
-              value: blinkText,
-              onChanged: (v) => onToggleBlinkText(v ?? false),
-              activeColor: active),
-          const Text('Blink Text', style: TextStyle(color: Colors.white)),
-          const SizedBox(width: 12),
-          Checkbox(
-              value: blinkBackground,
-              onChanged: (v) => onToggleBlinkBackground(v ?? false),
-              activeColor: active),
-          const Text('Blink Background', style: TextStyle(color: Colors.white)),
+  value: blinkText,
+  onChanged: (v) => onToggleBlinkText(v ?? false),
+  activeColor: Colors.lightBlueAccent,
+  checkColor: Colors.white,
+),
+const Text('Blink Text', style: TextStyle(color: Colors.white)),
+const SizedBox(width: 12),
+Checkbox(
+  value: blinkBackground,
+  onChanged: (v) => onToggleBlinkBackground(v ?? false),
+  activeColor: Colors.lightBlueAccent,
+  checkColor: Colors.white,
+),
+const Text('Blink Background', style: TextStyle(color: Colors.white)),
         ]),
         const SizedBox(height: 12),
         Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
@@ -318,7 +332,7 @@ class ControlPanel extends StatelessWidget {
                   style: TextStyle(
                       color: _foregroundFor(isBusy ? disabledColor : active))),
               style: ElevatedButton.styleFrom(
-                  backgroundColor: isBusy ? disabledColor : active,
+                  backgroundColor: Colors.lightBlueAccent,
                   padding: const EdgeInsets.symmetric(vertical: 12)),
             ),
           ),
@@ -331,37 +345,11 @@ class ControlPanel extends StatelessWidget {
                   color: _foregroundFor(isBusy ? disabledColor : active)),
               label: const Text('Download GIF'),
               style: ElevatedButton.styleFrom(
-                  backgroundColor: isBusy ? disabledColor : active,
+                  backgroundColor: Colors.lightBlueAccent,
                   foregroundColor:
                       _foregroundFor(isBusy ? disabledColor : active),
                   padding: const EdgeInsets.symmetric(vertical: 12)),
             ),
-          ),
-        ]),
-        const SizedBox(height: 8),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-          OutlinedButton.icon(
-            onPressed:
-                (isBusy || onSharePng == null) ? null : () => onSharePng!(),
-            icon: Icon(Icons.image, color: isBusy ? disabledColor : active),
-            label: Text('Share PNG',
-                style: TextStyle(color: isBusy ? disabledColor : active)),
-            style: OutlinedButton.styleFrom(
-                side: BorderSide(color: isBusy ? disabledColor : active),
-                padding:
-                    const EdgeInsets.symmetric(vertical: 10, horizontal: 8)),
-          ),
-          OutlinedButton.icon(
-            onPressed: (isBusy || onDownloadPng == null)
-                ? null
-                : () => onDownloadPng!(),
-            icon: Icon(Icons.save, color: isBusy ? disabledColor : active),
-            label: Text('Save PNG',
-                style: TextStyle(color: isBusy ? disabledColor : active)),
-            style: OutlinedButton.styleFrom(
-                side: BorderSide(color: isBusy ? disabledColor : active),
-                padding:
-                    const EdgeInsets.symmetric(vertical: 10, horizontal: 8)),
           ),
         ]),
       ]),
