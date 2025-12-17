@@ -1,4 +1,3 @@
-// lib/screens/led_scroller_screen.dart
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
@@ -19,7 +18,6 @@ import '../widgets/control_panel.dart';
 import '../widgets/fullscreen_preview.dart';
 import '../widgets/ai_audio_card.dart';
 import '../widgets/audio_source_sheet.dart';
-import 'privacy_policy.dart';
 
 class LedTestPage extends StatefulWidget {
   const LedTestPage({super.key});
@@ -50,13 +48,14 @@ class _LedTestPageState extends State<LedTestPage> {
   final GlobalKey previewKey = GlobalKey();
   final ImagePicker _picker = ImagePicker();
 
-  // Keep a reference to any currently active AI stream controller so we can cancel if needed
   StreamController<String>? _activeAiController;
   StreamSubscription<String>? _activeAiListener;
 
-  // Voice type for audio - using the one from audio_source_sheet.dart
   dynamic _selectedVoice;
   AudioSourceType? _audioSource;
+
+  String? _selectedBgMusic; // asset path
+
   late final AudioEngine _audioEngine;
 
   @override
@@ -64,6 +63,7 @@ class _LedTestPageState extends State<LedTestPage> {
     super.initState();
     textController.text = displayText;
     _selectedVoice = null;
+    _selectedBgMusic = null;
     _audioEngine = AudioEngine();
   }
 
@@ -74,6 +74,28 @@ class _LedTestPageState extends State<LedTestPage> {
     _audioEngine.dispose();
     textController.dispose();
     super.dispose();
+  }
+
+  Widget _bgMusicTile({required String title, String? asset}) {
+    return ListTile(
+      leading: const Icon(Icons.music_note),
+      title: Text(title),
+      trailing: _selectedBgMusic == asset
+          ? const Icon(Icons.check, color: Colors.green)
+          : null,
+      onTap: () async {
+        Navigator.pop(context);
+
+        if (asset == null) {
+          await _audioEngine.stopBackgroundMusic();
+          setState(() => _selectedBgMusic = null);
+          return;
+        }
+
+        setState(() => _selectedBgMusic = asset);
+        await _audioEngine.playBackgroundMusic(asset);
+      },
+    );
   }
 
   void _openBottomMenu() {
@@ -110,18 +132,6 @@ class _LedTestPageState extends State<LedTestPage> {
                 Navigator.of(ctx).pop();
                 _shareAppLink(
                     "https://play.google.com/store/apps/details?id=com.example.myapp");
-              },
-            ),
-            ListTile(
-              leading:
-                  const Icon(Icons.privacy_tip_outlined, color: Colors.white),
-              title: const Text('Privacy Policy',
-                  style: TextStyle(color: Colors.white)),
-              trailing: const Icon(Icons.chevron_right, color: Colors.white),
-              onTap: () {
-                Navigator.of(ctx).pop();
-                Navigator.of(context)
-                    .push(MaterialPageRoute(builder: (_) => const PrivacyPolicy()));
               },
             ),
             const SizedBox(height: 8),
@@ -247,8 +257,8 @@ class _LedTestPageState extends State<LedTestPage> {
                                   'Thanks! Rating: $rating ${comment.isEmpty ? '' : '- comment saved'}')));
                           commentCtrl.dispose();
                         },
-                        child: Text(showComment ? 'Submit' : 'Submit',
-                            style: const TextStyle(
+                        child: const Text('Submit',
+                            style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold)),
                       ),
@@ -432,9 +442,10 @@ class _LedTestPageState extends State<LedTestPage> {
     if (isRecording) return _showSnack('Busy — try again shortly.');
     _showSnack('Recording GIF (short)...');
     final bytes = await _recordGifBytes(durationSeconds: 3, fps: 6);
-    if (bytes == null)
+    if (bytes == null) {
       return _showSnack(
           'Failed to record GIF — try lower FPS or ensure preview fully visible.');
+    }
     final tmp = await getTemporaryDirectory();
     final file = await File(
             '${tmp.path}/led_${DateTime.now().millisecondsSinceEpoch}.gif')
@@ -558,7 +569,8 @@ class _LedTestPageState extends State<LedTestPage> {
     }));
   }
 
-  void _pumpSimulatedAi(StreamController<String> controller, String payload) async {
+  void _pumpSimulatedAi(
+      StreamController<String> controller, String payload) async {
     try {
       final reply = 'Simulated AI reply for: $payload';
       final words = reply.split(RegExp(r'\s+'));
@@ -599,7 +611,7 @@ class _LedTestPageState extends State<LedTestPage> {
                       _addToHistory(txt);
                     });
                     if (playing) {
-                      _audioEngine.play(txt);
+                      _audioEngine.playVoice(txt);
                     }
                   },
                   onAiAction: (payload) {
@@ -623,7 +635,7 @@ class _LedTestPageState extends State<LedTestPage> {
                         textController.text = built;
                       });
                       if (playing) {
-                        _audioEngine.play(built);
+                        _audioEngine.playVoice(built);
                       }
                     }, onError: (e) {
                       debugPrint('AI stream error on page listener: $e');
@@ -696,20 +708,55 @@ class _LedTestPageState extends State<LedTestPage> {
             isScrollControlled: true,
             backgroundColor: Colors.transparent,
             builder: (_) {
-              return AudioSourceSheet(
-                initialVoice: _selectedVoice,
-                onVoiceChanged: (v) {
-                  setState(() => _selectedVoice = v);
-                  _audioEngine.setVoice(v);
-                },
-                onSelected: (type) {
-                  setState(() => _audioSource = type);
-                  _audioEngine.setSource(type);
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  /// audio source sheet
+                  AudioSourceSheet(
+                    initialVoice: _selectedVoice,
+                    onVoiceChanged: (v) {
+                      setState(() => _selectedVoice = v);
+                      _audioEngine.setVoice(v);
+                    },
+                    onSelected: (type) {
+                      setState(() => _audioSource = type);
+                      _audioEngine.setSource(type);
 
-                  if (playing) {
-                    _audioEngine.play(displayText);
-                  }
-                },
+                      if (playing) {
+                        _audioEngine.playVoice(displayText);
+                      }
+                    },
+                  ),
+
+                  /// 🎵 background music
+                  Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Background Music',
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 12),
+                        _bgMusicTile(
+                          title: 'Soft Ambient',
+                          asset: 'assets/audio/ambient.mp3',
+                        ),
+                        _bgMusicTile(
+                          title: 'Digital Beat',
+                          asset: 'assets/audio/digital.mp3',
+                        ),
+                        _bgMusicTile(
+                          title: 'Stop Music',
+                          asset: null,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               );
             },
           );
@@ -767,26 +814,32 @@ class _LedTestPageState extends State<LedTestPage> {
                   });
 
                   if (playing) {
-                    _audioEngine.play(v);
+                    _audioEngine.playVoice(v);
                   }
                 },
                 onSpeedChanged: (v) => setState(() => speed = v),
                 onTextSizeChanged: (v) => setState(() => textSize = v),
                 onToggleBlinkText: (b) => setState(() => blinkText = b),
-                onToggleBlinkBackground: (b) => setState(() => blinkBackground = b),
+                onToggleBlinkBackground: (b) =>
+                    setState(() => blinkBackground = b),
                 onTogglePlay: () {
                   setState(() => playing = !playing);
 
                   if (playing) {
-                    _audioEngine.play(displayText);
+                    _audioEngine.playVoice(displayText);
+                    if (_selectedBgMusic != null) {
+                      _audioEngine.resumeBackgroundMusic();
+                    }
                   } else {
-                    _audioEngine.stop();
+                    _audioEngine.stopVoice();
+                    _audioEngine.pauseBackgroundMusic();
                   }
                 },
                 onSetDirection: (d) => setState(() => scrollDirection = d),
                 onPickBackgroundImage: (f) => setState(() => bgImageFile = f),
                 onPickTextColor: (c) => setState(() => textColor = c),
-                onPickBackgroundColor: (c) => setState(() => backgroundColor = c),
+                onPickBackgroundColor: (c) =>
+                    setState(() => backgroundColor = c),
                 onUseGradientChanged: (b) => setState(() => useGradient = b),
                 onUseLedDotsChanged: (b) => setState(() => useLedDots = b),
                 onShare: _recordAndShareGif,
@@ -801,11 +854,11 @@ class _LedTestPageState extends State<LedTestPage> {
                     textController.text = s;
                   });
                   if (playing) {
-                    _audioEngine.play(s);
+                    _audioEngine.playVoice(s);
                   }
                 },
-                onShareApp: () =>
-                    _shareAppLink("https://play.google.com/store/apps/details?id=com.example.myapp"),
+                onShareApp: () => _shareAppLink(
+                    "https://play.google.com/store/apps/details?id=com.example.myapp"),
                 onToggleFavorite: () {
                   _showSnack('Toggled favorite (not persisted)');
                 },

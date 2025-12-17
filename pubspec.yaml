@@ -50,15 +50,16 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/audio/
 
-    - assets/images/whats.png
-    - assets/images/insta.png
-    - assets/images/face.png
-    - assets/images/message.png
-    - assets/images/snapchat.png
-    - assets/images/telig.png
-    - assets/images/email.png
-    - assets/images/camera.png
-    - assets/images/ai.png
-    - assets/images/brow.png
-    - assets/images/micro.png
+    # - assets/images/whats.png
+    # - assets/images/insta.png
+    # - assets/images/face.png
+    # - assets/images/message.png
+    # - assets/images/snapchat.png
+    # - assets/images/telig.png
+    # - assets/images/email.png
+    # - assets/images/camera.png
+    # - assets/images/ai.png
+    # - assets/images/brow.png
+    # - assets/images/micro.png
