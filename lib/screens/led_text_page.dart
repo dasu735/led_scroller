@@ -12,15 +12,18 @@ import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:path/path.dart' as p;
+import '../services/audio_engine.dart';
 
 import '../widgets/preview_box.dart';
 import '../widgets/control_panel.dart';
 import '../widgets/fullscreen_preview.dart';
 import '../widgets/ai_audio_card.dart';
+import '../widgets/audio_source_sheet.dart';
 import 'privacy_policy.dart';
 
 class LedTestPage extends StatefulWidget {
   const LedTestPage({super.key});
+
   @override
   State<LedTestPage> createState() => _LedTestPageState();
 }
@@ -51,16 +54,24 @@ class _LedTestPageState extends State<LedTestPage> {
   StreamController<String>? _activeAiController;
   StreamSubscription<String>? _activeAiListener;
 
+  // Voice type for audio - using the one from audio_source_sheet.dart
+  dynamic _selectedVoice;
+  AudioSourceType? _audioSource;
+  late final AudioEngine _audioEngine;
+
   @override
   void initState() {
     super.initState();
     textController.text = displayText;
+    _selectedVoice = null;
+    _audioEngine = AudioEngine();
   }
 
   @override
   void dispose() {
     _activeAiListener?.cancel();
     _activeAiController?.close();
+    _audioEngine.dispose();
     textController.dispose();
     super.dispose();
   }
@@ -84,8 +95,7 @@ class _LedTestPageState extends State<LedTestPage> {
             const SizedBox(height: 12),
             ListTile(
               leading: const Icon(Icons.star_rate_rounded, color: Colors.white),
-              title:
-                  const Text('Rate App', style: TextStyle(color: Colors.white)),
+              title: const Text('Rate App', style: TextStyle(color: Colors.white)),
               trailing: const Icon(Icons.chevron_right, color: Colors.white),
               onTap: () {
                 Navigator.of(ctx).pop();
@@ -94,8 +104,7 @@ class _LedTestPageState extends State<LedTestPage> {
             ),
             ListTile(
               leading: const Icon(Icons.share, color: Colors.white),
-              title: const Text('Share App',
-                  style: TextStyle(color: Colors.white)),
+              title: const Text('Share App', style: TextStyle(color: Colors.white)),
               trailing: const Icon(Icons.chevron_right, color: Colors.white),
               onTap: () {
                 Navigator.of(ctx).pop();
@@ -132,8 +141,7 @@ class _LedTestPageState extends State<LedTestPage> {
           final bool showComment = rating <= 2 && rating > 0;
           return Dialog(
             backgroundColor: Colors.white,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 520),
               child: SingleChildScrollView(
@@ -291,26 +299,29 @@ class _LedTestPageState extends State<LedTestPage> {
           return SafeArea(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               ListTile(
-                  leading: const Icon(Icons.photo_library),
-                  title: const Text('Gallery'),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    _pickBackgroundImageFromGallery();
-                  }),
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Gallery'),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _pickBackgroundImageFromGallery();
+                },
+              ),
               ListTile(
-                  leading: const Icon(Icons.camera_alt),
-                  title: const Text('Camera'),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    _pickBackgroundImageFromCamera();
-                  }),
+                leading: const Icon(Icons.camera_alt),
+                title: const Text('Camera'),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _pickBackgroundImageFromCamera();
+                },
+              ),
               ListTile(
-                  leading: const Icon(Icons.clear),
-                  title: const Text('Clear background'),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    setState(() => bgImageFile = null);
-                  }),
+                leading: const Icon(Icons.clear),
+                title: const Text('Clear background'),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  setState(() => bgImageFile = null);
+                },
+              ),
             ]),
           );
         });
@@ -321,7 +332,6 @@ class _LedTestPageState extends State<LedTestPage> {
       final boundary = previewKey.currentContext?.findRenderObject()
           as RenderRepaintBoundary?;
       if (boundary == null) return null;
-      // use devicePixelRatio to get crisp images on high-dpi screens
       final dpr = ui.window.devicePixelRatio;
       final ui.Image image = await boundary.toImage(pixelRatio: dpr);
       final ByteData? byteData =
@@ -365,7 +375,6 @@ class _LedTestPageState extends State<LedTestPage> {
       _disableGlowForCapture = true;
     });
     try {
-      // small delay to let UI update without glow
       await Future.delayed(const Duration(milliseconds: 80));
       final boundary = previewKey.currentContext?.findRenderObject()
           as RenderRepaintBoundary?;
@@ -373,7 +382,6 @@ class _LedTestPageState extends State<LedTestPage> {
       final totalFrames = (durationSeconds * fps).clamp(1, 200).toInt();
       final frameDelayMs = (1000 / fps).round();
       final frames = <img.Image>[];
-      // initial settle
       await Future.delayed(const Duration(milliseconds: 50));
 
       for (int i = 0; i < totalFrames; i++) {
@@ -400,7 +408,7 @@ class _LedTestPageState extends State<LedTestPage> {
       }
       if (frames.isEmpty) return null;
       final encoder = img.GifEncoder();
-      final delayCs = (frameDelayMs / 10).round(); // centiseconds
+      final delayCs = (frameDelayMs / 10).round();
       for (final f in frames) {
         encoder.addFrame(f, duration: delayCs);
       }
@@ -454,12 +462,9 @@ class _LedTestPageState extends State<LedTestPage> {
     }
   }
 
-  /// Try to save to a platform-appropriate Downloads folder, falling back to app documents.
-  /// Returns the final saved full path.
-  Future<String> _saveBytesToDownloadsOrFallback(Uint8List bytes, String filename) async {
-    // Try common "Downloads" locations for each platform.
+  Future<String> _saveBytesToDownloadsOrFallback(
+      Uint8List bytes, String filename) async {
     try {
-      // 1) Desktop platforms - use getDownloadsDirectory (if available)
       if (!Platform.isAndroid && !Platform.isIOS) {
         try {
           final downloads = await getDownloadsDirectory();
@@ -473,10 +478,8 @@ class _LedTestPageState extends State<LedTestPage> {
         }
       }
 
-      // 2) Android - try common external downloads path first
       if (Platform.isAndroid) {
         try {
-          // Primary common path
           final candidate = '/storage/emulated/0/Download';
           final dir = Directory(candidate);
           if (await dir.exists()) {
@@ -488,7 +491,6 @@ class _LedTestPageState extends State<LedTestPage> {
           debugPrint('android primary download write failed: $e');
         }
 
-        // Fallback: try getExternalStorageDirectory then create a Downloads directory
         try {
           final ext = await getExternalStorageDirectory();
           if (ext != null) {
@@ -507,14 +509,12 @@ class _LedTestPageState extends State<LedTestPage> {
         }
       }
 
-      // 3) iOS and general fallback -> app documents directory
       final doc = await getApplicationDocumentsDirectory();
       final path = p.join(doc.path, filename);
       final f = await File(path).writeAsBytes(bytes);
       return f.path;
     } catch (e) {
       debugPrint('saveBytesToDownloadsOrFallback top-level failed: $e');
-      // As last resort, write to temporary directory
       final tmp = await getTemporaryDirectory();
       final fallbackPath = p.join(tmp.path, filename);
       final f = await File(fallbackPath).writeAsBytes(bytes);
@@ -558,14 +558,11 @@ class _LedTestPageState extends State<LedTestPage> {
     }));
   }
 
-  /// Simulated AI streaming: pushes word chunks into the provided controller then closes.
-  /// Replace this with your WebSocket or real streaming logic.
   void _pumpSimulatedAi(StreamController<String> controller, String payload) async {
     try {
       final reply = 'Simulated AI reply for: $payload';
       final words = reply.split(RegExp(r'\s+'));
       for (var i = 0; i < words.length; i++) {
-        // small delay to simulate incremental server streaming
         await Future.delayed(const Duration(milliseconds: 120));
         if (controller.isClosed) return;
         controller.add(words[i] + (i < words.length - 1 ? ' ' : ''));
@@ -578,7 +575,6 @@ class _LedTestPageState extends State<LedTestPage> {
     }
   }
 
-  // Open bottom sheet with the AiAudioCard (wires streaming to update displayText)
   void _openAiAudioCard() {
     showModalBottomSheet(
       context: context,
@@ -602,29 +598,23 @@ class _LedTestPageState extends State<LedTestPage> {
                       textController.text = txt;
                       _addToHistory(txt);
                     });
-                    // keep sheet open so user can tap AI
+                    if (playing) {
+                      _audioEngine.play(txt);
+                    }
                   },
-
-                  // When AI button is pressed - immediate notification
                   onAiAction: (payload) {
-                    // optional: show a small status snackbar
-                    _showSnack('Sent to AI: ${payload.length > 80 ? payload.substring(0,80)+'...' : payload}');
+                    _showSnack(
+                        'Sent to AI: ${payload.length > 80 ? payload.substring(0, 80) + '...' : payload}');
                   },
-
-                  // Build a broadcast stream for the payload; also listen here to update scroller live.
                   aiResponseStreamBuilder: (payload) {
-                    // Cancel any previously active stream/listener
                     _activeAiListener?.cancel();
                     _activeAiController?.close();
 
-                    // create a broadcast controller so both AiAudioCard and this page can listen
                     final controller = StreamController<String>.broadcast();
                     _activeAiController = controller;
 
-                    // start pumping simulated chunks (replace with your WS streaming)
                     _pumpSimulatedAi(controller, payload);
 
-                    // Listen here to update the displayText live as chunks arrive.
                     String built = '';
                     _activeAiListener = controller.stream.listen((chunk) {
                       built += chunk;
@@ -632,11 +622,13 @@ class _LedTestPageState extends State<LedTestPage> {
                         displayText = built;
                         textController.text = built;
                       });
+                      if (playing) {
+                        _audioEngine.play(built);
+                      }
                     }, onError: (e) {
                       debugPrint('AI stream error on page listener: $e');
                       if (mounted) _showSnack('AI stream error: $e');
                     }, onDone: () {
-                      // final text done — add to history and clear active refs
                       if (built.trim().isNotEmpty) {
                         _addToHistory(built.trim());
                       }
@@ -644,7 +636,6 @@ class _LedTestPageState extends State<LedTestPage> {
                       _activeAiController = null;
                     }, cancelOnError: true);
 
-                    // Return the broadcast stream to AiAudioCard so it can display the same stream too
                     return controller.stream;
                   },
                 ),
@@ -661,51 +652,68 @@ class _LedTestPageState extends State<LedTestPage> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-  backgroundColor: Colors.black,
-  title: const Text('Preview', style: TextStyle(color: Colors.white)),
-  leading: IconButton(
-    icon: const Icon(Icons.menu, color: Colors.white),
-    onPressed: _openBottomMenu,
-  ),
-  actions: [
-     GestureDetector(
-      onTap: _handlePreviewCameraPressed,
-      child: Container(
-        height: 36,
-        width: 36,
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: Colors.black26,
-          borderRadius: BorderRadius.circular(8),
+        backgroundColor: Colors.black,
+        title: const Text('Preview', style: TextStyle(color: Colors.white)),
+        leading: IconButton(
+          icon: const Icon(Icons.menu, color: Colors.white),
+          onPressed: _openBottomMenu,
         ),
-        child: Image.asset(
-          'assets/images/camera.png',
-          color: Colors.white,
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) =>
-              const Icon(Icons.camera_alt, color: Colors.white, size: 20),
-        ),
+        actions: [
+          GestureDetector(
+            onTap: _handlePreviewCameraPressed,
+            child: Container(
+              height: 36,
+              width: 36,
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.black26,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Image.asset(
+                'assets/images/camera.png',
+                color: Colors.white,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) =>
+                    const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.screen_rotation_alt),
+            onPressed: _openFullscreenPreview,
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
-    ),
-
-    const SizedBox(width: 8),
-    IconButton(
-      icon: const Icon(Icons.screen_rotation_alt),
-      onPressed: _openFullscreenPreview,
-    ),
-
-    // small spacing between icons
-    const SizedBox(width: 8),
-
-    // Custom camera tile (tappable)
-   
-  ],
-),
       floatingActionButton: FloatingActionButton(
-        heroTag: 'ai_mic_btn',
-        onPressed: _openAiAudioCard,
+        heroTag: 'audio_btn',
         child: const Icon(Icons.volume_down_alt),
+        onPressed: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) {
+              return AudioSourceSheet(
+                initialVoice: _selectedVoice,
+                onVoiceChanged: (v) {
+                  setState(() => _selectedVoice = v);
+                  _audioEngine.setVoice(v);
+                },
+                onSelected: (type) {
+                  setState(() => _audioSource = type);
+                  _audioEngine.setSource(type);
+
+                  if (playing) {
+                    _audioEngine.play(displayText);
+                  }
+                },
+              );
+            },
+          );
+        },
       ),
       body: SafeArea(
         child: Column(children: [
@@ -734,7 +742,11 @@ class _LedTestPageState extends State<LedTestPage> {
           ),
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(10, 10, 10, MediaQuery.of(context).viewInsets.bottom + 10),
+              padding: EdgeInsets.fromLTRB(
+                  10,
+                  10,
+                  10,
+                  MediaQuery.of(context).viewInsets.bottom + 10),
               child: ControlPanel(
                 textController: textController,
                 displayText: displayText,
@@ -753,12 +765,24 @@ class _LedTestPageState extends State<LedTestPage> {
                     displayText = v;
                     _addToHistory(v);
                   });
+
+                  if (playing) {
+                    _audioEngine.play(v);
+                  }
                 },
                 onSpeedChanged: (v) => setState(() => speed = v),
                 onTextSizeChanged: (v) => setState(() => textSize = v),
                 onToggleBlinkText: (b) => setState(() => blinkText = b),
                 onToggleBlinkBackground: (b) => setState(() => blinkBackground = b),
-                onTogglePlay: () => setState(() => playing = !playing),
+                onTogglePlay: () {
+                  setState(() => playing = !playing);
+
+                  if (playing) {
+                    _audioEngine.play(displayText);
+                  } else {
+                    _audioEngine.stop();
+                  }
+                },
                 onSetDirection: (d) => setState(() => scrollDirection = d),
                 onPickBackgroundImage: (f) => setState(() => bgImageFile = f),
                 onPickTextColor: (c) => setState(() => textColor = c),
@@ -776,8 +800,12 @@ class _LedTestPageState extends State<LedTestPage> {
                     displayText = s;
                     textController.text = s;
                   });
+                  if (playing) {
+                    _audioEngine.play(s);
+                  }
                 },
-                onShareApp: () => _shareAppLink("https://play.google.com/store/apps/details?id=com.example.myapp"),
+                onShareApp: () =>
+                    _shareAppLink("https://play.google.com/store/apps/details?id=com.example.myapp"),
                 onToggleFavorite: () {
                   _showSnack('Toggled favorite (not persisted)');
                 },
