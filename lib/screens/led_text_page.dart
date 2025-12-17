@@ -5,14 +5,15 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:cross_file/cross_file.dart';
+import 'package:cross_file/cross_file.dart' as cross;
 import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:path/path.dart' as p;
-import '../services/audio_engine.dart';
+import 'package:file_selector/file_selector.dart'; // for browser/file picker
 
+import '../services/audio_engine.dart';
 import '../widgets/preview_box.dart';
 import '../widgets/control_panel.dart';
 import '../widgets/fullscreen_preview.dart';
@@ -54,7 +55,8 @@ class _LedTestPageState extends State<LedTestPage> {
   dynamic _selectedVoice;
   AudioSourceType? _audioSource;
 
-  String? _selectedBgMusic; // asset path
+  /// Background music: can be asset path or file path
+  String? _selectedBgMusic;
 
   late final AudioEngine _audioEngine;
 
@@ -75,6 +77,10 @@ class _LedTestPageState extends State<LedTestPage> {
     textController.dispose();
     super.dispose();
   }
+
+  /// =========================
+  /// BACKGROUND MUSIC HELPERS
+  /// =========================
 
   Widget _bgMusicTile({required String title, String? asset}) {
     return ListTile(
@@ -98,6 +104,33 @@ class _LedTestPageState extends State<LedTestPage> {
     );
   }
 
+  Future<void> _pickBackgroundMusicFromBrowser() async {
+    const XTypeGroup typeGroup = XTypeGroup(
+      label: 'audio',
+      extensions: <String>['mp3', 'wav', 'm4a', 'aac', 'ogg'],
+    );
+
+    final XFile? file =
+        await openFile(acceptedTypeGroups: <XTypeGroup>[typeGroup]);
+    if (file == null) {
+      _showSnack('No audio selected');
+      return;
+    }
+
+    final path = file.path;
+    if (path.isEmpty) {
+      _showSnack('Selected file has no path');
+      return;
+    }
+
+    setState(() => _selectedBgMusic = path);
+    await _audioEngine.playBackgroundMusicFromFile(path);
+  }
+
+  /// =========================
+  /// BOTTOM MENU, RATE, SHARE
+  /// =========================
+
   void _openBottomMenu() {
     showModalBottomSheet(
       context: context,
@@ -117,8 +150,10 @@ class _LedTestPageState extends State<LedTestPage> {
             const SizedBox(height: 12),
             ListTile(
               leading: const Icon(Icons.star_rate_rounded, color: Colors.white),
-              title: const Text('Rate App', style: TextStyle(color: Colors.white)),
-              trailing: const Icon(Icons.chevron_right, color: Colors.white),
+              title:
+                  const Text('Rate App', style: TextStyle(color: Colors.white)),
+              trailing:
+                  const Icon(Icons.chevron_right, color: Colors.white),
               onTap: () {
                 Navigator.of(ctx).pop();
                 _showRateDialog();
@@ -126,8 +161,10 @@ class _LedTestPageState extends State<LedTestPage> {
             ),
             ListTile(
               leading: const Icon(Icons.share, color: Colors.white),
-              title: const Text('Share App', style: TextStyle(color: Colors.white)),
-              trailing: const Icon(Icons.chevron_right, color: Colors.white),
+              title:
+                  const Text('Share App', style: TextStyle(color: Colors.white)),
+              trailing:
+                  const Icon(Icons.chevron_right, color: Colors.white),
               onTap: () {
                 Navigator.of(ctx).pop();
                 _shareAppLink(
@@ -151,7 +188,8 @@ class _LedTestPageState extends State<LedTestPage> {
           final bool showComment = rating <= 2 && rating > 0;
           return Dialog(
             backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 520),
               child: SingleChildScrollView(
@@ -290,6 +328,10 @@ class _LedTestPageState extends State<LedTestPage> {
         subject: 'Digital LED Signboard');
   }
 
+  /// =========================
+  /// IMAGE PICK / CAPTURE
+  /// =========================
+
   Future<void> _pickBackgroundImageFromGallery() async {
     final XFile? x =
         await _picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
@@ -337,6 +379,10 @@ class _LedTestPageState extends State<LedTestPage> {
         });
   }
 
+  /// =========================
+  /// CAPTURE / SHARE / SAVE
+  /// =========================
+
   Future<Uint8List?> _capturePreviewPngBytes() async {
     try {
       final boundary = previewKey.currentContext?.findRenderObject()
@@ -360,7 +406,8 @@ class _LedTestPageState extends State<LedTestPage> {
     final file = await File(
             '${tmp.path}/led_${DateTime.now().millisecondsSinceEpoch}.png')
         .writeAsBytes(bytes);
-    await Share.shareXFiles([XFile(file.path)], text: 'LED preview (PNG)');
+    await Share.shareXFiles(
+        [cross.XFile(file.path)], text: 'LED preview (PNG)');
   }
 
   Future<void> _savePreviewPng() async {
@@ -450,7 +497,8 @@ class _LedTestPageState extends State<LedTestPage> {
     final file = await File(
             '${tmp.path}/led_${DateTime.now().millisecondsSinceEpoch}.gif')
         .writeAsBytes(bytes);
-    await Share.shareXFiles([XFile(file.path)], text: 'LED preview (GIF)');
+    await Share.shareXFiles(
+        [cross.XFile(file.path)], text: 'LED preview (GIF)');
   }
 
   Future<void> _recordAndSaveGif() async {
@@ -532,6 +580,10 @@ class _LedTestPageState extends State<LedTestPage> {
       return f.path;
     }
   }
+
+  /// =========================
+  /// HISTORY / UTILS
+  /// =========================
 
   void _showSnack(String msg) {
     if (!mounted) return;
@@ -659,6 +711,10 @@ class _LedTestPageState extends State<LedTestPage> {
     );
   }
 
+  /// =========================
+  /// BUILD
+  /// =========================
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -711,7 +767,7 @@ class _LedTestPageState extends State<LedTestPage> {
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  /// audio source sheet
+                  /// voice / source sheet
                   AudioSourceSheet(
                     initialVoice: _selectedVoice,
                     onVoiceChanged: (v) {
@@ -728,7 +784,7 @@ class _LedTestPageState extends State<LedTestPage> {
                     },
                   ),
 
-                  /// 🎵 background music
+                  /// background music section
                   Container(
                     color: Colors.white,
                     padding: const EdgeInsets.all(16),
@@ -748,6 +804,14 @@ class _LedTestPageState extends State<LedTestPage> {
                         _bgMusicTile(
                           title: 'Digital Beat',
                           asset: 'assets/audio/digital.mp3',
+                        ),
+                        ListTile(
+                          leading: const Icon(Icons.folder_open),
+                          title: const Text('Pick from Browser'),
+                          onTap: () async {
+                            Navigator.pop(context);
+                            await _pickBackgroundMusicFromBrowser();
+                          },
                         ),
                         _bgMusicTile(
                           title: 'Stop Music',
@@ -828,6 +892,7 @@ class _LedTestPageState extends State<LedTestPage> {
                   if (playing) {
                     _audioEngine.playVoice(displayText);
                     if (_selectedBgMusic != null) {
+                      // resume whichever background music was playing
                       _audioEngine.resumeBackgroundMusic();
                     }
                   } else {
@@ -857,8 +922,8 @@ class _LedTestPageState extends State<LedTestPage> {
                     _audioEngine.playVoice(s);
                   }
                 },
-                onShareApp: () => _shareAppLink(
-                    "https://play.google.com/store/apps/details?id=com.example.myapp"),
+                onShareApp: () =>
+                    _shareAppLink("https://play.google.com/store/apps/details?id=com.example.myapp"),
                 onToggleFavorite: () {
                   _showSnack('Toggled favorite (not persisted)');
                 },

@@ -85,21 +85,20 @@ class AudioEngine {
   }
 
   /// =========================
-  /// 🎵 BACKGROUND MUSIC
+  /// 🎵 BACKGROUND MUSIC – ASSETS
   /// =========================
   ///
-  /// assetPath is like 'assets/audio/ambient.mp3' coming from the UI.
-  /// Because 'assets/' is declared as a root in pubspec, audioplayers
-  /// expects the path *relative* to that root, e.g. 'audio/ambient.mp3'.
+  /// assetPath comes from UI as 'assets/audio/ambient.mp3'.
+  /// Because 'assets/' is declared as a root, audioplayers expects
+  /// the path relative to it, e.g. 'audio/ambient.mp3'.
   ///
   Future<void> playBackgroundMusic(String assetPath) async {
-    // Strip leading 'assets/' if present so it doesn't become assets/assets/...
     String relativePath = assetPath;
     if (relativePath.startsWith('assets/')) {
       relativePath = relativePath.substring('assets/'.length);
     }
 
-    print('🎵 Playing background music: $relativePath');
+    print('🎵 Playing background music (asset): $relativePath');
 
     try {
       await _bgPlayer.stop();
@@ -109,10 +108,31 @@ class AudioEngine {
       await _bgPlayer.play(AssetSource(relativePath));
 
       _bgPlaying = true;
-      print('✅ Background music started: $relativePath');
+      print('✅ Background music (asset) started: $relativePath');
     } catch (e) {
       _bgPlaying = false;
-      print('❌ Failed to play background music: $e');
+      print('❌ Failed to play background music (asset): $e');
+    }
+  }
+
+  /// =========================
+  /// 🎵 BACKGROUND MUSIC – FILE (BROWSER PICK)
+  /// =========================
+  Future<void> playBackgroundMusicFromFile(String filePath) async {
+    print('🎵 Playing background music (file): $filePath');
+
+    try {
+      await _bgPlayer.stop();
+      await _bgPlayer.setReleaseMode(ReleaseMode.loop);
+      await _bgPlayer.setVolume(0.4);
+
+      await _bgPlayer.play(DeviceFileSource(filePath));
+
+      _bgPlaying = true;
+      print('✅ Background music (file) started: $filePath');
+    } catch (e) {
+      _bgPlaying = false;
+      print('❌ Failed to play background music (file): $e');
     }
   }
 
