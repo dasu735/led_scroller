@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:led_digital_scroll/screens/led_text_page.dart';
+import 'package:led_digital_scroll/screens/splash/splash_screen.dart';
 
 
 
@@ -34,7 +35,7 @@ class MyApp extends StatelessWidget {
         // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: LedTestPage(),
+      home: SplashScreen(),
       debugShowCheckedModeBanner: false,
     );
   }
