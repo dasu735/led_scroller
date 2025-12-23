@@ -19,6 +19,7 @@ import '../widgets/control_panel.dart';
 import '../widgets/fullscreen_preview.dart';
 import '../widgets/ai_audio_card.dart';
 import '../widgets/audio_source_sheet.dart';
+import 'package:led_digital_scroll/screens/privacy_policy.dart'; // Import the privacy policy screen
 
 class LedTestPage extends StatefulWidget {
   const LedTestPage({super.key});
@@ -171,10 +172,29 @@ class _LedTestPageState extends State<LedTestPage> {
                     "https://play.google.com/store/apps/details?id=com.example.myapp");
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.privacy_tip, color: Colors.white),
+              title:
+                  const Text('Privacy Policy', style: TextStyle(color: Colors.white)),
+              trailing:
+                  const Icon(Icons.chevron_right, color: Colors.white),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _navigateToPrivacyPolicy();
+              },
+            ),
             const SizedBox(height: 8),
           ]),
         );
       },
+    );
+  }
+
+  void _navigateToPrivacyPolicy() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const PrivacyPolicy(),
+      ),
     );
   }
 

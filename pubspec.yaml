@@ -15,7 +15,7 @@ dependencies:
   # UI / Icons
   cupertino_icons: ^1.0.8
 
-  # Text-to-speech (optional)
+  # Text-to-speech
   flutter_tts: ^4.0.0
 
   # Networking
@@ -36,8 +36,6 @@ dependencies:
   path_provider: ^2.0.14
   file_selector: ^1.0.4
   audioplayers: ^6.5.1
-  
- 
 
 dev_dependencies:
   flutter_test:
@@ -45,21 +43,20 @@ dev_dependencies:
 
   flutter_lints: ^6.0.0
 
+  # ✅ App icon generator
+  flutter_launcher_icons: ^0.13.1
+
+# ✅ App icon configuration
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/app_icon.png"
+  adaptive_icon_background: "#121212"
+  adaptive_icon_foreground: "assets/images/app_icon.png"
+
 flutter:
   uses-material-design: true
 
   assets:
     - assets/images/
     - assets/audio/
-
-    # - assets/images/whats.png
-    # - assets/images/insta.png
-    # - assets/images/face.png
-    # - assets/images/message.png
-    # - assets/images/snapchat.png
-    # - assets/images/telig.png
-    # - assets/images/email.png
-    # - assets/images/camera.png
-    # - assets/images/ai.png
-    # - assets/images/brow.png
-    # - assets/images/micro.png
