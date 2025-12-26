@@ -22,6 +22,7 @@ class PreviewBox extends StatefulWidget {
   final bool blinkBackground;
   final ValueChanged<File?>? onPickBackgroundImage;
   final bool glow; // allow disabling glow for clean capture
+  final bool isRecording;
 
   const PreviewBox({
     super.key,
@@ -40,6 +41,7 @@ class PreviewBox extends StatefulWidget {
     required this.blinkBackground,
     this.onPickBackgroundImage,
     this.glow = true,
+    this.isRecording = false,
   });
 
   @override
@@ -233,6 +235,7 @@ class _PreviewBoxState extends State<PreviewBox>
                                 (widget.speed / 200.0) * 180.0 + 12.0,
                             playing: widget.playing,
                             directionLeft: widget.directionLeft,
+                            isRecording: widget.isRecording,
                           ),
                         ),
                       );
@@ -240,7 +243,6 @@ class _PreviewBoxState extends State<PreviewBox>
                   ),
                 );
               }),
-             
             ],
           ),
         ),

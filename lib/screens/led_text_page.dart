@@ -11,15 +11,16 @@ import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:path/path.dart' as p;
-import 'package:file_selector/file_selector.dart'; // for browser/file picker
+import 'package:file_selector/file_selector.dart';
 
 import '../services/audio_engine.dart';
+import '../services/video_recorder.dart';
 import '../widgets/preview_box.dart';
 import '../widgets/control_panel.dart';
 import '../widgets/fullscreen_preview.dart';
 import '../widgets/ai_audio_card.dart';
 import '../widgets/audio_source_sheet.dart';
-import 'package:led_digital_scroll/screens/privacy_policy.dart'; // Import the privacy policy screen
+import 'package:led_digital_scroll/screens/privacy_policy.dart';
 
 class LedTestPage extends StatefulWidget {
   const LedTestPage({super.key});
@@ -28,7 +29,15 @@ class LedTestPage extends StatefulWidget {
   State<LedTestPage> createState() => _LedTestPageState();
 }
 
-class _LedTestPageState extends State<LedTestPage> {
+class _LedTestPageState extends State<LedTestPage> with WidgetsBindingObserver {
+  // For lifecycle events
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _audioEngine.stopBackgroundMusic();
+    }
+  }
+
   String displayText = "LED SCROLLER";
   double speed = 50;
   double textSize = 120;
@@ -45,6 +54,8 @@ class _LedTestPageState extends State<LedTestPage> {
   final List<String> history = [];
   bool isRecording = false;
   bool _disableGlowForCapture = false;
+  double _recordingProgress = 0.0;
+  String? _lastVideoPath;
 
   final TextEditingController textController = TextEditingController();
   final GlobalKey previewKey = GlobalKey();
@@ -55,8 +66,6 @@ class _LedTestPageState extends State<LedTestPage> {
 
   dynamic _selectedVoice;
   AudioSourceType? _audioSource;
-
-  /// Background music: can be asset path or file path
   String? _selectedBgMusic;
 
   late final AudioEngine _audioEngine;
@@ -68,6 +77,7 @@ class _LedTestPageState extends State<LedTestPage> {
     _selectedVoice = null;
     _selectedBgMusic = null;
     _audioEngine = AudioEngine();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
@@ -76,6 +86,7 @@ class _LedTestPageState extends State<LedTestPage> {
     _activeAiController?.close();
     _audioEngine.dispose();
     textController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -146,15 +157,15 @@ class _LedTestPageState extends State<LedTestPage> {
               width: 48,
               height: 4,
               decoration: BoxDecoration(
-                  color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(height: 12),
             ListTile(
               leading: const Icon(Icons.star_rate_rounded, color: Colors.white),
               title:
                   const Text('Rate App', style: TextStyle(color: Colors.white)),
-              trailing:
-                  const Icon(Icons.chevron_right, color: Colors.white),
+              trailing: const Icon(Icons.chevron_right, color: Colors.white),
               onTap: () {
                 Navigator.of(ctx).pop();
                 _showRateDialog();
@@ -162,10 +173,9 @@ class _LedTestPageState extends State<LedTestPage> {
             ),
             ListTile(
               leading: const Icon(Icons.share, color: Colors.white),
-              title:
-                  const Text('Share App', style: TextStyle(color: Colors.white)),
-              trailing:
-                  const Icon(Icons.chevron_right, color: Colors.white),
+              title: const Text('Share App',
+                  style: TextStyle(color: Colors.white)),
+              trailing: const Icon(Icons.chevron_right, color: Colors.white),
               onTap: () {
                 Navigator.of(ctx).pop();
                 _shareAppLink(
@@ -174,10 +184,9 @@ class _LedTestPageState extends State<LedTestPage> {
             ),
             ListTile(
               leading: const Icon(Icons.privacy_tip, color: Colors.white),
-              title:
-                  const Text('Privacy Policy', style: TextStyle(color: Colors.white)),
-              trailing:
-                  const Icon(Icons.chevron_right, color: Colors.white),
+              title: const Text('Privacy Policy',
+                  style: TextStyle(color: Colors.white)),
+              trailing: const Icon(Icons.chevron_right, color: Colors.white),
               onTap: () {
                 Navigator.of(ctx).pop();
                 _navigateToPrivacyPolicy();
@@ -254,7 +263,8 @@ class _LedTestPageState extends State<LedTestPage> {
                           final starIndex = i + 1;
                           final filled = starIndex <= rating;
                           return GestureDetector(
-                            onTap: () => setStateDialog(() => rating = starIndex),
+                            onTap: () =>
+                                setStateDialog(() => rating = starIndex),
                             child: Padding(
                               padding:
                                   const EdgeInsets.symmetric(horizontal: 6.0),
@@ -400,7 +410,7 @@ class _LedTestPageState extends State<LedTestPage> {
   }
 
   /// =========================
-  /// CAPTURE / SHARE / SAVE
+  /// CAPTURE / SHARE / SAVE (PNG & GIF)
   /// =========================
 
   Future<Uint8List?> _capturePreviewPngBytes() async {
@@ -426,8 +436,8 @@ class _LedTestPageState extends State<LedTestPage> {
     final file = await File(
             '${tmp.path}/led_${DateTime.now().millisecondsSinceEpoch}.png')
         .writeAsBytes(bytes);
-    await Share.shareXFiles(
-        [cross.XFile(file.path)], text: 'LED preview (PNG)');
+    await Share.shareXFiles([cross.XFile(file.path)],
+        text: 'LED preview (PNG)');
   }
 
   Future<void> _savePreviewPng() async {
@@ -517,8 +527,8 @@ class _LedTestPageState extends State<LedTestPage> {
     final file = await File(
             '${tmp.path}/led_${DateTime.now().millisecondsSinceEpoch}.gif')
         .writeAsBytes(bytes);
-    await Share.shareXFiles(
-        [cross.XFile(file.path)], text: 'LED preview (GIF)');
+    await Share.shareXFiles([cross.XFile(file.path)],
+        text: 'LED preview (GIF)');
   }
 
   Future<void> _recordAndSaveGif() async {
@@ -540,6 +550,374 @@ class _LedTestPageState extends State<LedTestPage> {
       _showSnack('Failed to save GIF: $e');
     }
   }
+
+  /// =========================
+  /// VIDEO RECORDING - UPDATED OPTIMIZED VERSION
+  /// =========================
+
+  Future<void> _recordAndShareVideo() async {
+    if (isRecording) {
+      _showSnack('Already recording, please wait...');
+      return;
+    }
+
+    setState(() {
+      isRecording = true;
+      _recordingProgress = 0.0;
+      _disableGlowForCapture = true;
+    });
+
+    try {
+      // Show recording progress dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => _buildRecordingDialog(),
+      );
+
+      final videoPath = await VideoRecorder.recordVideo(
+        boundaryKey: previewKey,
+        durationSeconds: 10, // Force 10 seconds for sharing
+        fps: 15, // Lower FPS for speed
+        audioPath: _selectedBgMusic ?? 'assets/audio/digital.mp3',
+        maxWidth: 640, // Lower resolution
+        fitMode: 'horizontal', // <-- set to 'horizontal' for full width
+        onProgress: (progress) {
+          setState(() {
+            _recordingProgress = progress;
+          });
+        },
+        onComplete: (path) {
+          _lastVideoPath = path;
+        },
+      );
+
+      // Close progress dialog
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (videoPath == null) {
+        _showSnack('Failed to create video');
+        return;
+      }
+
+      // Show sharing options
+      await _showVideoSharingOptions(videoPath);
+    } catch (e) {
+      debugPrint('Video recording error: $e');
+      _showSnack('Error: $e');
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isRecording = false;
+          _disableGlowForCapture = false;
+          _recordingProgress = 0.0;
+        });
+      }
+    }
+  }
+
+  Future<void> _recordAndSaveVideo() async {
+    if (isRecording) {
+      _showSnack('Already recording, please wait...');
+      return;
+    }
+
+    setState(() {
+      isRecording = true;
+      _recordingProgress = 0.0;
+      _disableGlowForCapture = true;
+    });
+
+    try {
+      // Show recording progress dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => _buildRecordingDialog(),
+      );
+
+      final videoPath = await VideoRecorder.recordVideo(
+        boundaryKey: previewKey,
+        durationSeconds: 10, // Force 10 seconds for saving
+        fps: 20,
+        audioPath: _selectedBgMusic,
+        maxWidth: 720,
+        fitMode: 'horizontal', // <-- set to 'horizontal' for full width
+        saveToGallery: true, // Auto-save to gallery
+        onProgress: (progress) {
+          setState(() {
+            _recordingProgress = progress;
+          });
+        },
+      );
+
+      // Close progress dialog
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (videoPath != null) {
+        _lastVideoPath = videoPath;
+
+        // Get video info for feedback
+        final info = await VideoRecorder.getVideoInfo(videoPath);
+        final size = info['readableSize'] ?? 'Unknown size';
+
+        _showSnack('✅ Video saved to gallery! ($size)');
+      } else {
+        _showSnack('Failed to save video');
+      }
+    } catch (e) {
+      debugPrint('Video save error: $e');
+      _showSnack('Error: $e');
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isRecording = false;
+          _disableGlowForCapture = false;
+          _recordingProgress = 0.0;
+        });
+      }
+    }
+  }
+
+  Widget _buildRecordingDialog() {
+    return AlertDialog(
+      backgroundColor: Colors.black87,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Recording Video',
+            style: TextStyle(color: Colors.white, fontSize: 18),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: 80,
+            height: 80,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                CircularProgressIndicator(
+                  value: _recordingProgress > 0 ? _recordingProgress : null,
+                  strokeWidth: 6,
+                  backgroundColor: Colors.grey[800],
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.amber),
+                ),
+                Text(
+                  '${(_recordingProgress * 100).toInt()}%',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _getRecordingStage(_recordingProgress),
+            style: const TextStyle(color: Colors.grey, fontSize: 14),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getRecordingStage(double progress) {
+    if (progress < 0.3) return 'Capturing frames...';
+    if (progress < 0.6) return 'Encoding video...';
+    if (progress < 0.9) return 'Adding audio...';
+    return 'Finalizing video...';
+  }
+
+  Future<void> _showVideoSharingOptions(String videoPath) async {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 16),
+              const Text(
+                'Video Created Successfully!',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              FutureBuilder<Map<String, dynamic>>(
+                future: VideoRecorder.getVideoInfo(videoPath),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData && snapshot.data!['exists'] == true) {
+                    final info = snapshot.data!;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Size:',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.w500)),
+                              Text(info['readableSize'] ?? 'Unknown'),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Duration:',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.w500)),
+                              const Text('5 seconds'),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Audio:',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.w500)),
+                              Text(_selectedBgMusic != null
+                                  ? '✓ Added'
+                                  : 'No audio'),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: CircularProgressIndicator(),
+                  );
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.share, color: Colors.blue, size: 28),
+                title:
+                    const Text('Share Video', style: TextStyle(fontSize: 16)),
+                onTap: () {
+                  Navigator.pop(context);
+                  VideoRecorder.shareVideo(
+                    videoPath,
+                    title: 'LED Video: $displayText',
+                    context: context,
+                    audioPath: _selectedBgMusic,
+                  );
+                },
+              ),
+              ListTile(
+                leading:
+                    const Icon(Icons.save_alt, color: Colors.green, size: 28),
+                title: const Text('Save to Gallery Again',
+                    style: TextStyle(fontSize: 16)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final saved =
+                      await VideoRecorder.saveVideoToGallery(videoPath);
+                  if (mounted) {
+                    _showSnack(saved
+                        ? '✅ Video saved to gallery!'
+                        : '❌ Failed to save video');
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.play_circle,
+                    color: Colors.amber, size: 28),
+                title: const Text('Play Video', style: TextStyle(fontSize: 16)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  _showSnack(
+                      'Use your device\'s video player to play the file');
+                },
+              ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  'Video saved at:\n$videoPath',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Quick record button for faster recording
+  Future<void> _quickRecord() async {
+    if (isRecording) return;
+
+    setState(() {
+      isRecording = true;
+      _recordingProgress = 0.0;
+    });
+
+    try {
+      final videoPath = await VideoRecorder.recordVideo(
+        boundaryKey: previewKey,
+        durationSeconds: 10, // Force 10 seconds for quick record
+        fps: 12, // Low FPS for speed
+        audioPath: _selectedBgMusic,
+        maxWidth: 480, // Low resolution
+        fitMode: 'horizontal', // <-- set to 'horizontal' for full width
+        saveToGallery: true,
+        onProgress: (progress) {
+          setState(() {
+            _recordingProgress = progress;
+          });
+        },
+      );
+
+      if (videoPath != null) {
+        _lastVideoPath = videoPath;
+        if (mounted) {
+          _showSnack('✅ Quick video saved!');
+        }
+      }
+    } catch (e) {
+      debugPrint('Quick record error: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          isRecording = false;
+          _recordingProgress = 0.0;
+        });
+      }
+    }
+  }
+
+  /// =========================
+  /// FILE SAVING UTILITIES
+  /// =========================
 
   Future<String> _saveBytesToDownloadsOrFallback(
       Uint8List bytes, String filename) async {
@@ -607,7 +985,12 @@ class _LedTestPageState extends State<LedTestPage> {
 
   void _showSnack(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   void _addToHistory(String t) {
@@ -666,7 +1049,8 @@ class _LedTestPageState extends State<LedTestPage> {
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
           child: Container(
             decoration: const BoxDecoration(
               color: Colors.white,
@@ -732,7 +1116,7 @@ class _LedTestPageState extends State<LedTestPage> {
   }
 
   /// =========================
-  /// BUILD
+  /// BUILD METHOD WITH VIDEO RECORDING UI
   /// =========================
 
   @override
@@ -741,12 +1125,21 @@ class _LedTestPageState extends State<LedTestPage> {
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
-        title: const Text('Preview', style: TextStyle(color: Colors.white)),
+        title: const Text('LED Video Creator',
+            style: TextStyle(color: Colors.white)),
         leading: IconButton(
           icon: const Icon(Icons.menu, color: Colors.white),
           onPressed: _openBottomMenu,
         ),
         actions: [
+          // Quick record button in app bar
+          if (!isRecording)
+            IconButton(
+              icon: const Icon(Icons.videocam, color: Colors.amber),
+              tooltip: 'Quick Record (3s)',
+              onPressed: _quickRecord,
+            ),
+          const SizedBox(width: 8),
           GestureDetector(
             onTap: _handlePreviewCameraPressed,
             child: Container(
@@ -775,182 +1168,275 @@ class _LedTestPageState extends State<LedTestPage> {
           const SizedBox(width: 8),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'audio_btn',
-        child: const Icon(Icons.volume_down_alt),
-        onPressed: () {
-          showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            backgroundColor: Colors.transparent,
-            builder: (_) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  /// voice / source sheet
-                  AudioSourceSheet(
-                    initialVoice: _selectedVoice,
-                    onVoiceChanged: (v) {
-                      setState(() => _selectedVoice = v);
-                      _audioEngine.setVoice(v);
-                    },
-                    onSelected: (type) {
-                      setState(() => _audioSource = type);
-                      _audioEngine.setSource(type);
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          // Video record button (red)
+          FloatingActionButton(
+            heroTag: 'video_btn',
+            backgroundColor: Colors.red,
+            child: isRecording
+                ? const CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    strokeWidth: 3,
+                  )
+                : const Icon(Icons.videocam, color: Colors.white),
+            onPressed: isRecording ? null : _recordAndSaveVideo,
+          ),
+          const SizedBox(height: 16),
+          // Audio button (amber)
+          FloatingActionButton(
+            heroTag: 'audio_btn',
+            backgroundColor: Colors.amber,
+            child: const Icon(Icons.volume_down_alt, color: Colors.black),
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) {
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      /// voice / source sheet
+                      AudioSourceSheet(
+                        initialVoice: _selectedVoice,
+                        onVoiceChanged: (v) {
+                          setState(() => _selectedVoice = v);
+                          _audioEngine.setVoice(v);
+                        },
+                        onSelected: (type) {
+                          setState(() => _audioSource = type);
+                          _audioEngine.setSource(type);
 
-                      if (playing) {
-                        _audioEngine.playVoice(displayText);
-                      }
-                    },
-                  ),
+                          if (playing) {
+                            _audioEngine.playVoice(displayText);
+                          }
+                        },
+                      ),
 
-                  /// background music section
-                  Container(
-                    color: Colors.white,
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Background Music',
-                          style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.bold),
+                      /// background music section
+                      Container(
+                        color: Colors.white,
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Background Music',
+                              style: TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 12),
+                            _bgMusicTile(
+                              title: 'Soft Ambient',
+                              asset: 'assets/audio/ambient.mp3',
+                            ),
+                            _bgMusicTile(
+                              title: 'Digital Beat',
+                              asset: 'assets/audio/digital.mp3',
+                            ),
+                            ListTile(
+                              leading: const Icon(Icons.folder_open),
+                              title: const Text('Pick from Browser'),
+                              onTap: () async {
+                                Navigator.pop(context);
+                                await _pickBackgroundMusicFromBrowser();
+                              },
+                            ),
+                            _bgMusicTile(
+                              title: 'Stop Music',
+                              asset: null,
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 12),
-                        _bgMusicTile(
-                          title: 'Soft Ambient',
-                          asset: 'assets/audio/ambient.mp3',
-                        ),
-                        _bgMusicTile(
-                          title: 'Digital Beat',
-                          asset: 'assets/audio/digital.mp3',
-                        ),
-                        ListTile(
-                          leading: const Icon(Icons.folder_open),
-                          title: const Text('Pick from Browser'),
-                          onTap: () async {
-                            Navigator.pop(context);
-                            await _pickBackgroundMusicFromBrowser();
-                          },
-                        ),
-                        _bgMusicTile(
-                          title: 'Stop Music',
-                          asset: null,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                      ),
+                    ],
+                  );
+                },
               );
             },
-          );
-        },
+          ),
+        ],
       ),
       body: SafeArea(
-        child: Column(children: [
-          PreviewBox(
-            previewKey: previewKey,
-            displayText: displayText,
-            textSize: textSize,
-            textColor: textColor,
-            backgroundColor: backgroundColor,
-            useGradient: useGradient,
-            useLedDots: useLedDots,
-            bgImageFile: bgImageFile,
-            speed: speed,
-            playing: playing,
-            directionLeft: scrollDirection == -1,
-            blinkText: blinkText,
-            blinkBackground: blinkBackground,
-            glow: !_disableGlowForCapture,
-            onPickBackgroundImage: (file) {
-              if (file == null) {
-                _showImagePickChooser();
-              } else {
-                setState(() => bgImageFile = file);
-              }
-            },
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                  10,
-                  10,
-                  10,
-                  MediaQuery.of(context).viewInsets.bottom + 10),
-              child: ControlPanel(
-                textController: textController,
-                displayText: displayText,
-                textColor: textColor,
-                backgroundColor: backgroundColor,
-                speed: speed,
-                textSize: textSize,
-                blinkText: blinkText,
-                blinkBackground: blinkBackground,
-                history: history,
-                isBusy: isRecording,
-                playing: playing,
-                isFavorite: false,
-                onTextChanged: (v) {
-                  setState(() {
-                    displayText = v;
-                    _addToHistory(v);
-                  });
-
-                  if (playing) {
-                    _audioEngine.playVoice(v);
-                  }
-                },
-                onSpeedChanged: (v) => setState(() => speed = v),
-                onTextSizeChanged: (v) => setState(() => textSize = v),
-                onToggleBlinkText: (b) => setState(() => blinkText = b),
-                onToggleBlinkBackground: (b) =>
-                    setState(() => blinkBackground = b),
-                onTogglePlay: () {
-                  setState(() => playing = !playing);
-
-                  if (playing) {
-                    _audioEngine.playVoice(displayText);
-                    if (_selectedBgMusic != null) {
-                      // resume whichever background music was playing
-                      _audioEngine.resumeBackgroundMusic();
+        child: Column(
+          children: [
+            // Preview with recording indicator overlay
+            Stack(
+              children: [
+                PreviewBox(
+                  previewKey: previewKey,
+                  displayText: displayText,
+                  textSize: textSize,
+                  textColor: textColor,
+                  backgroundColor: backgroundColor,
+                  useGradient: useGradient,
+                  useLedDots: useLedDots,
+                  bgImageFile: bgImageFile,
+                  speed: speed,
+                  playing: playing,
+                  directionLeft: scrollDirection == -1,
+                  blinkText: blinkText,
+                  blinkBackground: blinkBackground,
+                  glow: !_disableGlowForCapture,
+                  isRecording: isRecording,
+                  onPickBackgroundImage: (file) {
+                    if (file == null) {
+                      _showImagePickChooser();
+                    } else {
+                      setState(() => bgImageFile = file);
                     }
-                  } else {
-                    _audioEngine.stopVoice();
-                    _audioEngine.pauseBackgroundMusic();
-                  }
-                },
-                onSetDirection: (d) => setState(() => scrollDirection = d),
-                onPickBackgroundImage: (f) => setState(() => bgImageFile = f),
-                onPickTextColor: (c) => setState(() => textColor = c),
-                onPickBackgroundColor: (c) =>
-                    setState(() => backgroundColor = c),
-                onUseGradientChanged: (b) => setState(() => useGradient = b),
-                onUseLedDotsChanged: (b) => setState(() => useLedDots = b),
-                onShare: _recordAndShareGif,
-                onDownload: _recordAndSaveGif,
-                onSharePng: _sharePreviewAsPng,
-                onDownloadPng: _savePreviewPng,
-                onOpenImagePicker: _showImagePickChooser,
-                onDeleteHistoryAt: _deleteHistoryAt,
-                onPickHistoryItem: (s) {
-                  setState(() {
-                    displayText = s;
-                    textController.text = s;
-                  });
-                  if (playing) {
-                    _audioEngine.playVoice(s);
-                  }
-                },
-                onShareApp: () =>
-                    _shareAppLink("https://play.google.com/store/apps/details?id=com.example.myapp"),
-                onToggleFavorite: () {
-                  _showSnack('Toggled favorite (not persisted)');
-                },
+                  },
+                ),
+                if (isRecording)
+                  Positioned.fill(
+                    child: Container(
+                      color: Colors.black54,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 100,
+                              height: 100,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  CircularProgressIndicator(
+                                    value: _recordingProgress,
+                                    strokeWidth: 8,
+                                    backgroundColor: Colors.grey[800],
+                                    valueColor:
+                                        const AlwaysStoppedAnimation<Color>(
+                                            Colors.red),
+                                  ),
+                                  Text(
+                                    '${(_recordingProgress * 100).toInt()}%',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            const Text(
+                              'Recording Video...',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 40),
+                              child: Text(
+                                _getRecordingStage(_recordingProgress),
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 14,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            // Control panel
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  10,
+                  10,
+                  10,
+                  MediaQuery.of(context).viewInsets.bottom + 10,
+                ),
+                child: ControlPanel(
+                  textController: textController,
+                  displayText: displayText,
+                  textColor: textColor,
+                  backgroundColor: backgroundColor,
+                  speed: speed,
+                  textSize: textSize,
+                  blinkText: blinkText,
+                  blinkBackground: blinkBackground,
+                  history: history,
+                  isBusy: isRecording,
+                  playing: playing,
+                  isFavorite: false,
+                  onTextChanged: (v) {
+                    setState(() {
+                      displayText = v;
+                      _addToHistory(v);
+                    });
+
+                    if (playing) {
+                      _audioEngine.playVoice(v);
+                    }
+                  },
+                  onSpeedChanged: (v) => setState(() => speed = v),
+                  onTextSizeChanged: (v) => setState(() => textSize = v),
+                  onToggleBlinkText: (b) => setState(() => blinkText = b),
+                  onToggleBlinkBackground: (b) =>
+                      setState(() => blinkBackground = b),
+                  onTogglePlay: () {
+                    setState(() => playing = !playing);
+
+                    if (playing) {
+                      _audioEngine.playVoice(displayText);
+                      if (_selectedBgMusic != null) {
+                        // resume whichever background music was playing
+                        _audioEngine.resumeBackgroundMusic();
+                      }
+                    } else {
+                      _audioEngine.stopVoice();
+                      _audioEngine.pauseBackgroundMusic();
+                    }
+                  },
+                  onSetDirection: (d) => setState(() => scrollDirection = d),
+                  onPickBackgroundImage: (f) => setState(() => bgImageFile = f),
+                  onPickTextColor: (c) => setState(() => textColor = c),
+                  onPickBackgroundColor: (c) =>
+                      setState(() => backgroundColor = c),
+                  onUseGradientChanged: (b) => setState(() => useGradient = b),
+                  onUseLedDotsChanged: (b) => setState(() => useLedDots = b),
+                  onShare: _recordAndShareGif,
+                  onDownload: _recordAndSaveGif,
+                  onSharePng: _sharePreviewAsPng,
+                  onDownloadPng: _savePreviewPng,
+                  onShareVideo: _recordAndShareVideo,
+                  onDownloadVideo: _recordAndSaveVideo,
+                  onOpenImagePicker: _showImagePickChooser,
+                  onDeleteHistoryAt: _deleteHistoryAt,
+                  onPickHistoryItem: (s) {
+                    setState(() {
+                      displayText = s;
+                      textController.text = s;
+                    });
+                    if (playing) {
+                      _audioEngine.playVoice(s);
+                    }
+                  },
+                  onShareApp: () => _shareAppLink(
+                      "https://play.google.com/store/apps/details?id=com.example.myapp"),
+                  onToggleFavorite: () {
+                    _showSnack('Toggled favorite (not persisted)');
+                  },
+                ),
               ),
             ),
-          ),
-        ]),
+          ],
+        ),
       ),
     );
   }

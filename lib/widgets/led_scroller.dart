@@ -19,6 +19,7 @@ class LedScroller extends StatefulWidget {
   final double speedPxPerSec;
   final bool playing;
   final bool directionLeft;
+  final bool isRecording;
 
   const LedScroller({
     super.key,
@@ -31,6 +32,7 @@ class LedScroller extends StatefulWidget {
     required this.speedPxPerSec,
     required this.playing,
     required this.directionLeft,
+    this.isRecording = false,
   });
 
   @override
@@ -47,7 +49,7 @@ class _LedScrollerState extends State<LedScroller>
   void initState() {
     super.initState();
     _ticker = createTicker(_onTick);
-    if (widget.playing) _ticker.start();
+    if (widget.playing && !_ticker.isActive) _ticker.start();
     if (!widget.playing) _ticker.muted = true;
   }
 
@@ -58,7 +60,7 @@ class _LedScrollerState extends State<LedScroller>
       if (widget.playing) {
         _last = Duration.zero;
         _ticker.muted = false;
-        _ticker.start();
+        if (!_ticker.isActive) _ticker.start();
       } else {
         _ticker.muted = true;
       }

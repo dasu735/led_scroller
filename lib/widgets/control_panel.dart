@@ -35,6 +35,8 @@ class ControlPanel extends StatelessWidget {
   final Future<void> Function()? onDownload;
   final Future<void> Function()? onSharePng;
   final Future<void> Function()? onDownloadPng;
+  final Future<void> Function()? onShareVideo;
+  final Future<void> Function()? onDownloadVideo;
   final VoidCallback onOpenImagePicker;
   final ValueChanged<int> onDeleteHistoryAt;
   final ValueChanged<String> onPickHistoryItem;
@@ -71,6 +73,8 @@ class ControlPanel extends StatelessWidget {
     required this.onDownload,
     required this.onSharePng,
     required this.onDownloadPng,
+    required this.onShareVideo,
+    required this.onDownloadVideo,
     required this.onOpenImagePicker,
     required this.onDeleteHistoryAt,
     required this.onPickHistoryItem,
@@ -274,9 +278,9 @@ class ControlPanel extends StatelessWidget {
               },
               style:
                   ElevatedButton.styleFrom(backgroundColor: Colors.grey[800]),
-              child: const Text('Solid',style: TextStyle(
-                color: Colors.white
-              ),
+              child: const Text(
+                'Solid',
+                style: TextStyle(color: Colors.white),
               )),
           ElevatedButton(
               onPressed: () {
@@ -286,9 +290,9 @@ class ControlPanel extends StatelessWidget {
               },
               style:
                   ElevatedButton.styleFrom(backgroundColor: Colors.grey[800]),
-              child: const Text('Gradient',style: TextStyle(
-                color: Colors.white
-              ),
+              child: const Text(
+                'Gradient',
+                style: TextStyle(color: Colors.white),
               )),
           ElevatedButton(
               onPressed: () {
@@ -298,28 +302,28 @@ class ControlPanel extends StatelessWidget {
               },
               style:
                   ElevatedButton.styleFrom(backgroundColor: Colors.grey[800]),
-              child: const Text('LED',style: TextStyle(
-                color: Colors.white
-              ),
+              child: const Text(
+                'LED',
+                style: TextStyle(color: Colors.white),
               )),
         ]),
         const SizedBox(height: 12),
         Row(children: [
           Checkbox(
-  value: blinkText,
-  onChanged: (v) => onToggleBlinkText(v ?? false),
-  activeColor: Colors.lightBlueAccent,
-  checkColor: Colors.white,
-),
-const Text('Blink Text', style: TextStyle(color: Colors.white)),
-const SizedBox(width: 12),
-Checkbox(
-  value: blinkBackground,
-  onChanged: (v) => onToggleBlinkBackground(v ?? false),
-  activeColor: Colors.lightBlueAccent,
-  checkColor: Colors.white,
-),
-const Text('Blink Background', style: TextStyle(color: Colors.white)),
+            value: blinkText,
+            onChanged: (v) => onToggleBlinkText(v ?? false),
+            activeColor: Colors.lightBlueAccent,
+            checkColor: Colors.white,
+          ),
+          const Text('Blink Text', style: TextStyle(color: Colors.white)),
+          const SizedBox(width: 12),
+          Checkbox(
+            value: blinkBackground,
+            onChanged: (v) => onToggleBlinkBackground(v ?? false),
+            activeColor: Colors.lightBlueAccent,
+            checkColor: Colors.white,
+          ),
+          const Text('Blink Background', style: TextStyle(color: Colors.white)),
         ]),
         const SizedBox(height: 12),
         Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
@@ -346,6 +350,40 @@ const Text('Blink Background', style: TextStyle(color: Colors.white)),
               label: const Text('Download GIF'),
               style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.lightBlueAccent,
+                  foregroundColor:
+                      _foregroundFor(isBusy ? disabledColor : active),
+                  padding: const EdgeInsets.symmetric(vertical: 12)),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 8),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: (isBusy || onShareVideo == null)
+                  ? null
+                  : () => onShareVideo!(),
+              icon: Icon(Icons.videocam,
+                  color: _foregroundFor(isBusy ? disabledColor : active)),
+              label: Text(isBusy ? 'Processing...' : 'Share Video',
+                  style: TextStyle(
+                      color: _foregroundFor(isBusy ? disabledColor : active))),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurpleAccent,
+                  padding: const EdgeInsets.symmetric(vertical: 12)),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: (isBusy || onDownloadVideo == null)
+                  ? null
+                  : () => onDownloadVideo!(),
+              icon: Icon(Icons.video_file,
+                  color: _foregroundFor(isBusy ? disabledColor : active)),
+              label: const Text('Download Video'),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurpleAccent,
                   foregroundColor:
                       _foregroundFor(isBusy ? disabledColor : active),
                   padding: const EdgeInsets.symmetric(vertical: 12)),

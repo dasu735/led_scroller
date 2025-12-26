@@ -1,8 +1,6 @@
 name: led_digital_scroll
-description: "A new Flutter project."
-
+description: LED Digital Scroller with Video Recording
 publish_to: "none"
-
 version: 1.0.0+1
 
 environment:
@@ -12,51 +10,43 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # UI / Icons
-  cupertino_icons: ^1.0.8
+  # Video & FFmpeg
+  ffmpeg_kit_flutter_new: ^3.2.0 # Use the new fork
 
-  # Text-to-speech
-  flutter_tts: ^4.0.0
+  # File handling & sharing
+  gallery_saver_plus: ^3.2.9
+  share_plus: ^7.0.1
+  cross_file: ^0.3.3
+  file_selector: ^0.9.3
+  path_provider: ^2.1.0
+  path: ^1.9.0
+  device_info_plus: ^10.1.0
 
-  # Networking
-  http: ^1.5.0
-
-  # Color picker UI
-  flutter_colorpicker: ^1.0.3
-
-  # Share files (images/gifs)
-  share_plus: ^12.0.0
-  url_launcher: ^6.1.10
-  webview_flutter: ^4.10.2
-  speech_to_text: ^7.3.0
-  image: ^4.0.17
-  shared_preferences: ^2.1.2
-  marquee: ^2.2.3
-  image_picker: ^1.2.0
-  path_provider: ^2.0.14
-  file_selector: ^1.0.4
+  # Audio
   audioplayers: ^6.5.1
+  just_audio: ^0.9.35
+
+  # Images
+  image_picker: ^1.0.4
+  image: ^4.0.17
+
+  # UI & Utilities
+  provider: ^6.0.5
+  url_launcher: ^6.2.1
+  permission_handler: ^11.1.0
+  marquee: ^2.3.0
+  flutter_tts: ^4.0.2
+  speech_to_text: ^7.3.0
+  flutter_colorpicker: ^1.1.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
-  flutter_lints: ^6.0.0
-
-  # ✅ App icon generator
-  flutter_launcher_icons: ^0.13.1
-
-# ✅ App icon configuration
-flutter_icons:
-  android: true
-  ios: true
-  image_path: "assets/images/app_icon.png"
-  adaptive_icon_background: "#121212"
-  adaptive_icon_foreground: "assets/images/app_icon.png"
+  flutter_lints: ^3.0.0
 
 flutter:
   uses-material-design: true
 
   assets:
-    - assets/images/
     - assets/audio/
+    - assets/images/

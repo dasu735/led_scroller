@@ -31,6 +31,8 @@ dependencyResolutionManagement {
         maven("https://jitpack.io")
         // This is the important one that resolves io.flutter:* AARs in many setups:
         maven("https://storage.googleapis.com/download.flutter.io")
+        // FFmpeg Kit Maven repository
+        maven("https://github.com/arthenica/ffmpeg-kit/releases/download/v6.0/")
     }
 }
 
